@@ -40,7 +40,7 @@ def _render_template(template: object, values: dict) -> str:
 @register(
     "astrbot_plugin_better_balance",
     "Xing",
-    "NEWAPI 网关额度管理插件。",
+    "每日聊天配额与模型供应商余额管理插件",
     "0.4.0",
 )
 class BetterBalancePlugin(Star):

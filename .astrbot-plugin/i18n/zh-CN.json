@@ -1,8 +1,8 @@
 {
   "metadata": {
     "display_name": "更好的额度管理",
-    "short_desc": "管理 NEWAPI 网关配额、供应商余额与 Token 用量。",
-    "desc": "设置每日配额和余额供应商，编辑查询文本并查看用量。"
+    "short_desc": "每日聊天配额与模型供应商余额管理插件",
+    "desc": "每日聊天配额与模型供应商余额管理插件"
   },
   "views": {
     "management": {
