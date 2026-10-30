@@ -1,0 +1,1906 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>更好的额度管理</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, "Microsoft YaHei", "PingFang SC", sans-serif;
+        --text: #242833;
+        --muted: #687080;
+        --surface: #ffffff;
+        --surface-soft: #f7f8fa;
+        --border: #dfe3e9;
+        --accent: #3668c9;
+        --accent-hover: #2855ad;
+        --danger: #b42318;
+        --success: #167647;
+        --focus: #88aaf0;
+        --field-bg: #ffffff;
+        --shadow: 0 1px 2px rgb(16 24 40 / 5%);
+      }
+
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --text: #e8eaf0;
+        --muted: #a2a8b5;
+        --surface: #20232b;
+        --surface-soft: #282c35;
+        --border: #3d424d;
+        --accent: #8aaeff;
+        --accent-hover: #a7c1ff;
+        --danger: #ff938a;
+        --success: #75d5a2;
+        --focus: #7197e8;
+        --field-bg: #181b21;
+        --shadow: 0 1px 2px rgb(0 0 0 / 20%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 22px;
+        color: var(--text);
+        background: transparent;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      button,
+      input,
+      textarea {
+        color: inherit;
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      .page {
+        width: min(1180px, 100%);
+        margin: 0 auto;
+      }
+
+      .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        margin: 0 0 18px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 4px;
+        font-size: 23px;
+        font-weight: 650;
+        line-height: 1.3;
+      }
+
+      h2 {
+        margin-bottom: 4px;
+        font-size: 17px;
+        font-weight: 620;
+      }
+
+      h3 {
+        margin-bottom: 4px;
+        font-size: 15px;
+        font-weight: 620;
+      }
+
+      .description,
+      .hint,
+      .muted {
+        color: var(--muted);
+      }
+
+      .description,
+      .hint {
+        margin-bottom: 0;
+        font-size: 13px;
+      }
+
+      .header-actions,
+      .action-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .action-row {
+        flex-wrap: wrap;
+      }
+
+      .button {
+        min-height: 38px;
+        padding: 8px 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--text);
+        box-shadow: var(--shadow);
+        white-space: nowrap;
+      }
+
+      .button:hover:not(:disabled) {
+        background: var(--surface-soft);
+      }
+
+      .button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .button-primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #ffffff;
+      }
+
+      html[data-theme="dark"] .button-primary {
+        color: #101721;
+      }
+
+      .button-primary:hover:not(:disabled) {
+        border-color: var(--accent-hover);
+        background: var(--accent-hover);
+      }
+
+      .button-danger {
+        min-height: 34px;
+        padding: 5px 10px;
+        color: var(--danger);
+      }
+
+      .section-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .tab {
+        min-height: 42px;
+        padding: 8px 15px;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .tab[aria-selected="true"] {
+        border-bottom-color: var(--accent);
+        color: var(--text);
+        font-weight: 620;
+      }
+
+      .panel-stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .card {
+        min-width: 0;
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .card-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 15px;
+      }
+
+      .card-heading > div {
+        min-width: 0;
+      }
+
+      .field-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .field label,
+      .field-label {
+        font-weight: 560;
+      }
+
+      .field input,
+      .field textarea,
+      .table-input,
+      .table-textarea {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--field-bg);
+      }
+
+      .field input,
+      .table-input {
+        min-height: 38px;
+        padding: 7px 10px;
+      }
+
+      .field textarea {
+        min-height: 106px;
+        padding: 9px 10px;
+        resize: vertical;
+      }
+
+      .table-textarea {
+        min-height: 70px;
+        padding: 7px 9px;
+        resize: vertical;
+      }
+
+      .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+      }
+
+      .edit-table {
+        min-width: 700px;
+      }
+
+      .usage-table {
+        min-width: 900px;
+      }
+
+      th,
+      td {
+        padding: 10px 11px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--surface-soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      td {
+        min-width: 0;
+      }
+
+      .empty-row {
+        padding: 22px 12px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .template-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .template-grid .field {
+        align-content: start;
+      }
+
+      .template-grid textarea {
+        min-height: 112px;
+      }
+
+      .status {
+        min-height: 21px;
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .status[data-tone="success"] {
+        color: var(--success);
+      }
+
+      .status[data-tone="error"] {
+        color: var(--danger);
+      }
+
+      .save-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 2px;
+      }
+
+      .usage-meta {
+        min-height: 20px;
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .empty-panel {
+        min-height: 160px;
+      }
+
+      .empty-panel h2 {
+        margin: 0;
+      }
+
+      select {
+        color: inherit;
+        font: inherit;
+      }
+
+      .field select,
+      .record-card input,
+      .record-card select,
+      .record-card textarea {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--field-bg);
+        color: var(--text);
+      }
+
+      .field select,
+      .record-card input,
+      .record-card select {
+        min-height: 38px;
+        padding: 7px 10px;
+      }
+
+      .record-card textarea {
+        min-height: 86px;
+        padding: 8px 10px;
+        resize: vertical;
+      }
+
+      .record-stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .record-card {
+        min-width: 0;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        background: var(--surface);
+      }
+
+      .record-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .record-header > div {
+        min-width: 0;
+      }
+
+      .record-header h3 {
+        margin-bottom: 3px;
+      }
+
+      .record-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .record-form {
+        display: grid;
+        gap: 16px;
+      }
+
+      .balance-fields {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .record-card .field {
+        align-content: start;
+      }
+
+      .provider-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px 12px;
+        max-height: 190px;
+        overflow: auto;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--field-bg);
+      }
+
+      .provider-choice {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        min-width: 0;
+        padding: 4px 0;
+        color: var(--text);
+        overflow-wrap: anywhere;
+      }
+
+      .provider-choice input {
+        width: auto;
+        min-height: auto;
+        margin: 3px 0 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        accent-color: var(--accent);
+      }
+
+      .provider-choice span {
+        min-width: 0;
+      }
+
+      .field-help {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      .scan-summary {
+        margin: 8px 0 0;
+      }
+
+      .result-table {
+        min-width: 760px;
+      }
+
+      .result-error {
+        color: var(--danger);
+        overflow-wrap: anywhere;
+      }
+
+      .result-ok {
+        color: var(--success);
+      }
+
+      .text-section-heading {
+        margin: 0 0 14px;
+      }
+
+      .status[data-tone="warning"] {
+        color: #9a6700;
+      }
+
+      html[data-theme="dark"] .status[data-tone="warning"] {
+        color: #f2cc60;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      @media (max-width: 760px) {
+        body {
+          padding: 15px;
+        }
+
+        .page-header {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 12px;
+        }
+
+        .header-actions {
+          justify-content: flex-start;
+        }
+
+        .field-grid,
+        .template-grid,
+        .balance-fields,
+        .provider-options {
+          grid-template-columns: 1fr;
+        }
+
+        .card {
+          padding: 15px;
+        }
+      }
+
+      @media (max-width: 460px) {
+        body {
+          padding: 12px;
+        }
+
+        h1 {
+          font-size: 21px;
+        }
+
+        .section-tabs {
+          justify-content: space-between;
+        }
+
+        .tab {
+          flex: 1;
+          padding-right: 8px;
+          padding-left: 8px;
+        }
+
+        .card-heading {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .record-header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .card-heading > .button {
+          align-self: flex-start;
+        }
+
+        .save-row {
+          align-items: stretch;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <div>
+          <h1>额度与余额管理</h1>
+          <p class="description">管理每日配额、余额供应商和查询文本；原生插件设置与本页共用一份配置。</p>
+        </div>
+        <div class="header-actions">
+          <button class="button" id="reload-config" type="button" title="从 AstrBot 读取已保存的配置；会覆盖本页尚未保存的编辑">重新读取设置</button>
+          <button class="button" id="refresh-usage" type="button">刷新用量</button>
+        </div>
+      </header>
+
+      <nav class="section-tabs" role="tablist" aria-label="插件管理板块">
+        <button class="tab" id="tab-quota" type="button" role="tab" aria-controls="panel-quota" aria-selected="true">配额管理</button>
+        <button class="tab" id="tab-balance" type="button" role="tab" aria-controls="panel-balance" aria-selected="false">余额管理</button>
+        <button class="tab" id="tab-text" type="button" role="tab" aria-controls="panel-text" aria-selected="false">文本设置</button>
+      </nav>
+
+      <section id="panel-quota" class="panel-stack" role="tabpanel" aria-labelledby="tab-quota">
+        <div class="card">
+          <div class="card-heading">
+            <div>
+              <h2>默认配额</h2>
+              <p class="hint">配额设为 -1 表示加入黑名单并禁止 LLM 请求；0 表示不限额；正整数表示每天可成功发送的 LLM 回复轮数，同一轮的工具和判断调用不重复扣次。修改重置时间会保留本期用量，并在下一个设定时刻重置。</p>
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="reset-time">每日重置时间（北京时间）</label>
+              <input id="reset-time" type="time" value="00:00" />
+            </div>
+            <div class="field">
+              <label for="default-user-limit">默认私聊配额（次）</label>
+              <input id="default-user-limit" type="number" min="-1" step="1" inputmode="numeric" value="70" />
+            </div>
+            <div class="field">
+              <label for="default-group-limit">默认群聊配额（次）</label>
+              <input id="default-group-limit" type="number" min="-1" step="1" inputmode="numeric" value="200" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-heading">
+            <div>
+              <h2>用户组</h2>
+              <p class="hint">每个 QQ 号只能属于一个用户组；组内成员各自使用该组配额，不共享用量。配额含义同上（-1 黑名单、0 不限额、正整数为每日成功发送的 LLM 回复轮数）。成员按 QQ 号填写，可用换行或逗号分隔。</p>
+            </div>
+            <button class="button" id="add-user-group" type="button">添加用户组</button>
+          </div>
+          <div class="table-wrap">
+            <table class="edit-table">
+              <thead>
+                <tr>
+                  <th scope="col">名称</th>
+                  <th scope="col">每日配额</th>
+                  <th scope="col">QQ 号列表</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="user-groups"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-heading">
+            <div>
+              <h2>群规则</h2>
+              <p class="hint">为指定群设置配额，群内成员共享该群配额；未列出的群使用默认值。配额含义同上（-1 黑名单、0 不限额、正整数为每日成功发送的 LLM 回复轮数）。</p>
+            </div>
+            <button class="button" id="add-group-rule" type="button">添加群规则</button>
+          </div>
+          <div class="table-wrap">
+            <table class="edit-table">
+              <thead>
+                <tr>
+                  <th scope="col">群号</th>
+                  <th scope="col">每日配额</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="group-rules"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="save-row">
+          <p id="save-status" class="status" role="status" aria-live="polite"></p>
+          <button class="button button-primary save-button" data-save-scope="quota" type="button">保存全部设置</button>
+        </div>
+
+        <div class="card">
+          <div class="card-heading">
+            <div>
+              <h2>今日用量</h2>
+              <p class="hint">按平台、会话类型和目标查看当前周期用量及下次重置时间。</p>
+            </div>
+            <button class="button" id="refresh-usage-card" type="button">刷新</button>
+          </div>
+          <div class="table-wrap">
+            <table class="usage-table">
+              <thead>
+                <tr>
+                  <th scope="col">范围</th>
+                  <th scope="col">类型</th>
+                  <th scope="col">目标</th>
+                  <th scope="col">周期</th>
+                  <th scope="col">已用</th>
+                  <th scope="col">总额</th>
+                  <th scope="col">预留</th>
+                  <th scope="col">剩余</th>
+                  <th scope="col">下次重置（北京时间）</th>
+                </tr>
+              </thead>
+              <tbody id="usage-rows"></tbody>
+            </table>
+          </div>
+          <p id="usage-status" class="usage-meta" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section id="panel-balance" class="panel-stack" role="tabpanel" aria-labelledby="tab-balance" hidden>
+        <div class="card">
+          <div class="card-heading">
+            <div>
+              <h2>余额供应商</h2>
+              <p class="hint">绑定 AstrBot 供应商 ID 可多选；扫描仅读取本地配置，不发起余额请求。手动查询凭证不会从模型供应商密钥自动复制。</p>
+            </div>
+            <div class="action-row">
+              <button class="button" id="reload-balance-catalog" type="button">刷新供应商列表</button>
+              <button class="button" id="scan-balance" type="button">重新扫描</button>
+              <button class="button button-primary" id="add-balance-record" type="button">添加记录</button>
+            </div>
+          </div>
+          <p id="balance-catalog-status" class="status" role="status" aria-live="polite"></p>
+          <p id="balance-scan-status" class="status scan-summary" role="status" aria-live="polite"></p>
+        </div>
+
+        <div id="balance-records" class="record-stack"></div>
+
+        <div class="card">
+          <div class="card-heading">
+            <div>
+              <h2>余额查询预览</h2>
+              <p class="hint">单条查询与全部查询显示在同一结果表中；失败供应商各占一行。查询使用已保存的设置，修改记录后请先保存。</p>
+            </div>
+            <button class="button button-primary" id="query-all-balances" type="button">查询全部</button>
+          </div>
+          <div class="table-wrap">
+            <table class="result-table">
+              <thead>
+                <tr>
+                  <th scope="col">别名</th>
+                  <th scope="col">余额</th>
+                  <th scope="col">币种</th>
+                  <th scope="col">状态</th>
+                  <th scope="col">其他数据或错误</th>
+                </tr>
+              </thead>
+              <tbody id="balance-results"></tbody>
+            </table>
+          </div>
+          <p id="balance-query-status" class="usage-meta" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="save-row">
+          <p id="balance-save-status" class="status" role="status" aria-live="polite"></p>
+          <button class="button button-primary save-button" data-save-scope="balance" type="button">保存全部设置</button>
+        </div>
+      </section>
+
+      <section id="panel-text" class="panel-stack" role="tabpanel" aria-labelledby="tab-text" hidden>
+        <div id="text-settings-container" class="panel-stack"></div>
+        <div class="save-row">
+          <p id="text-save-status" class="status" role="status" aria-live="polite"></p>
+          <button class="button button-primary save-button" data-save-scope="text" type="button">保存全部设置</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="/api/plugin/page/bridge-sdk.js"></script>
+    <script>
+      (() => {
+        const bridge = window.AstrBotPluginView;
+        const byId = (id) => document.getElementById(id);
+        const saveStatus = byId("save-status");
+        const usageStatus = byId("usage-status");
+        const balanceCatalogStatus = byId("balance-catalog-status");
+        const balanceScanStatus = byId("balance-scan-status");
+        const balanceSaveStatus = byId("balance-save-status");
+        const textSaveStatus = byId("text-save-status");
+        const userGroupsBody = byId("user-groups");
+        const groupRulesBody = byId("group-rules");
+        const usageRowsBody = byId("usage-rows");
+        const balanceRecordsRoot = byId("balance-records");
+        const balanceResultsBody = byId("balance-results");
+        const textSettingsRoot = byId("text-settings-container");
+        const reloadConfigButton = byId("reload-config");
+        const saveButtons = Array.from(document.querySelectorAll(".save-button"));
+
+        const quotaTextKeys = [
+          ["quota_reply", "私聊有限额回复", "今日已用 {used} 次，总配额 {total} 次。", "支持 {used}（已用次数）和 {total}（每日配额）；不要使用其他格式表达式。"],
+          ["unlimited_reply", "私聊不限额回复", "今日已用 {used} 次，个人额度不限。", "支持 {used} 和 {total}；不要使用其他格式表达式。"],
+          ["group_quota_reply", "群聊有限额回复", "本群今日已用 {used} 次，总配额 {total} 次。", "支持 {used}（本群已用次数）和 {total}（本群配额）；不要使用其他格式表达式。"],
+          ["group_unlimited_reply", "群聊不限额回复", "本群今日已用 {used} 次，群额度不限。", "支持 {used} 和 {total}；不要使用其他格式表达式。"],
+          ["exhausted_reply", "配额耗尽回复", "今日配额已用尽，请在下次重置后再试。", "支持 {used} 和 {total}；不要使用其他格式表达式。"],
+          ["blacklist_reply", "黑名单回复", "当前会话已被禁止聊天，请联系管理员。", "支持 {used} 和 {total}；不要使用其他格式表达式。"],
+        ];
+        const balanceTextKeys = [
+          ["balance_deepseek", "DeepSeek 余额", "{别名}：{余额} {币种}（赠送 {赠送余额}，充值 {充值余额}）", "支持 {别名}、{余额}、{币种}、{赠送余额}、{充值余额}；不要使用其他格式表达式。"],
+          ["balance_kimi", "Kimi 余额", "{别名}：{余额} {币种}（代金券 {代金券余额}，现金 {现金余额}）", "支持 {别名}、{余额}、{币种}、{代金券余额}、{现金余额}；不要使用其他格式表达式。"],
+          ["balance_openrouter", "OpenRouter 余额", "{别名}：{余额} {币种}", "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"],
+          ["balance_aliyun", "阿里云 BSS 余额", "{别名}：{余额} {币种}", "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"],
+          ["balance_volcengine", "火山引擎余额", "{别名}：{余额} {币种}", "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"],
+          ["balance_custom", "自定义服务余额", "{别名}：{余额} {币种}", "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"],
+        ];
+        const otherTextKeys = [
+          ["balance_all_failure", "全部查询失败", "{别名}：查询失败（{错误}）", "支持 {别名} 和 {错误}；不要使用其他格式表达式。"],
+          ["balance_failure", "单条查询失败", "{别名}：查询失败（{错误}）", "支持 {别名} 和 {错误}；不要使用其他格式表达式。"],
+          ["balance_not_found", "未找到供应商", "未找到供应商：{别名}。", "支持 {别名}；不要使用其他格式表达式。"],
+          ["balance_unbound", "当前供应商未配置", "当前会话的供应商尚未配置余额查询。", "此文本不接受占位符。"],
+          ["balance_empty", "余额记录为空", "尚未记录模型供应商。", "此文本不接受占位符。"],
+          ["balance_usage_hint", "Token 用量命令提示", "用法：{前缀}余额 所有／当前／别名／用量 1天|3天|1周", "支持 {前缀}；不要使用其他格式表达式。"],
+          ["usage_reply", "Token 用量回复", "最近{时间}全局 Token 用量：{token}。", "支持 {时间} 和 {token}；不要使用其他格式表达式。"],
+          ["usage_failure", "Token 用量失败", "暂时无法读取全局 Token 用量。", "此文本不接受占位符。"],
+          ["help_reply", "帮助回复", "{命令列表}", "支持 {命令列表}；不要使用其他格式表达式。"],
+        ];
+        const defaultTextSettings = Object.fromEntries(
+          [...quotaTextKeys, ...balanceTextKeys, ...otherTextKeys].map(([key, , value]) => [key, value]),
+        );
+        const textSections = [
+          { title: "配额回复", fields: quotaTextKeys },
+          { title: "余额回复模板", fields: balanceTextKeys },
+          { title: "失败与状态回复", fields: otherTextKeys.slice(0, 5) },
+          { title: "Token 用量与帮助", fields: otherTextKeys.slice(5) },
+        ];
+        const fallbackKinds = [
+          ["deepseek", "DeepSeek"],
+          ["kimi", "Kimi（月之暗面）"],
+          ["openrouter", "OpenRouter"],
+          ["aliyun", "阿里云 BSS"],
+          ["volcengine", "火山引擎"],
+          ["custom_openai", "自定义（OpenAI 来源）"],
+          ["custom_anthropic", "自定义（Anthropic 来源）"],
+          ["custom", "自定义 HTTP"],
+        ];
+        const reservedAliases = new Set(["所有", "当前", "用量"]);
+        let config = null;
+        let catalog = [];
+        let catalogByKind = new Map();
+        let astrbotProviders = [];
+        let balanceResults = [];
+        let balanceDirty = false;
+
+        function setStatus(element, message, tone) {
+          element.textContent = message || "";
+          if (tone) {
+            element.setAttribute("data-tone", tone);
+          } else {
+            element.removeAttribute("data-tone");
+          }
+        }
+
+        function makeCell(parent, text) {
+          const cell = document.createElement("td");
+          cell.textContent = text == null || text === "" ? "—" : String(text);
+          parent.append(cell);
+          return cell;
+        }
+
+        function makeInput(value, label, inputMode) {
+          const input = document.createElement("input");
+          input.className = "table-input";
+          input.type = "text";
+          input.value = value == null ? "" : String(value);
+          input.setAttribute("aria-label", label);
+          if (inputMode) {
+            input.setAttribute("inputmode", inputMode);
+          }
+          return input;
+        }
+
+        function makeLimitInput(value, label) {
+          const input = document.createElement("input");
+          input.className = "table-input";
+          input.type = "number";
+          input.min = "-1";
+          input.step = "1";
+          input.inputMode = "numeric";
+          input.value = value == null ? "" : String(value);
+          input.setAttribute("aria-label", label);
+          return input;
+        }
+
+        function readInteger(value) {
+          if (!String(value).trim()) {
+            return null;
+          }
+          const parsed = Number(value);
+          return Number.isSafeInteger(parsed) ? parsed : null;
+        }
+
+        function newId() {
+          if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+            return crypto.randomUUID();
+          }
+          return "record-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+        }
+
+        function defaultSettingsFor(kind) {
+          const item = catalogByKind.get(kind);
+          const settings = item && item.settings && typeof item.settings === "object" ? item.settings : {};
+          return JSON.parse(JSON.stringify(settings));
+        }
+
+        function normalizedConfigFromResponse(response) {
+          const next = response && response.config ? response.config : response;
+          if (!next || typeof next !== "object" || Array.isArray(next)) {
+            throw new Error("服务器返回的配置格式无效");
+          }
+          next.user_groups = Array.isArray(next.user_groups) ? next.user_groups : [];
+          next.group_rules = Array.isArray(next.group_rules) ? next.group_rules : [];
+          next.balance_providers = Array.isArray(next.balance_providers) ? next.balance_providers : [];
+          const textSettings =
+            next.text_settings && typeof next.text_settings === "object" && !Array.isArray(next.text_settings)
+              ? next.text_settings
+              : {};
+          ["quota_reply", "unlimited_reply", "group_quota_reply", "group_unlimited_reply", "blacklist_reply", "exhausted_reply"].forEach((key) => {
+            if (textSettings[key] == null && next[key] != null) {
+              textSettings[key] = next[key];
+            }
+            delete next[key];
+          });
+          next.text_settings = { ...defaultTextSettings, ...textSettings };
+          next.balance_providers = next.balance_providers.map((record) => ({
+            id: record && record.id ? String(record.id) : newId(),
+            alias: record && record.alias != null ? String(record.alias) : "",
+            kind: record && record.kind ? String(record.kind) : "custom",
+            provider_ids: record && Array.isArray(record.provider_ids) ? record.provider_ids.map(String) : [],
+            credential_ref: record && record.credential_ref != null ? String(record.credential_ref) : "",
+            settings:
+              record && record.settings && typeof record.settings === "object" && !Array.isArray(record.settings)
+                ? record.settings
+                : {},
+            origin: record && record.origin ? String(record.origin) : "manual",
+            scan_status: record && record.scan_status ? String(record.scan_status) : "needs_configuration",
+            scan_note: record && record.scan_note ? String(record.scan_note) : "",
+          }));
+          return next;
+        }        function renderUserGroups() {
+          userGroupsBody.replaceChildren();
+          if (!config.user_groups.length) {
+            const row = document.createElement("tr");
+            const cell = makeCell(row, "暂无用户组");
+            cell.className = "empty-row";
+            cell.colSpan = 4;
+            userGroupsBody.append(row);
+            return;
+          }
+          config.user_groups.forEach((group, index) => {
+            const row = document.createElement("tr");
+            const nameCell = document.createElement("td");
+            const nameInput = makeInput(group.name, "用户组名称");
+            nameInput.addEventListener("input", () => { group.name = nameInput.value; });
+            nameCell.append(nameInput);
+            row.append(nameCell);
+
+            const limitCell = document.createElement("td");
+            const limitInput = makeLimitInput(group.daily_limit, "用户组每日配额");
+            limitInput.addEventListener("input", () => { group.daily_limit = readInteger(limitInput.value); });
+            limitCell.append(limitInput);
+            row.append(limitCell);
+
+            const usersCell = document.createElement("td");
+            const usersInput = document.createElement("textarea");
+            usersInput.className = "table-textarea";
+            usersInput.value = Array.isArray(group.user_ids) ? group.user_ids.join("\n") : "";
+            usersInput.setAttribute("aria-label", "用户组 QQ 号列表");
+            usersInput.placeholder = "一个 QQ 号一行，也可用逗号分隔";
+            usersInput.addEventListener("input", () => {
+              group.user_ids = usersInput.value.split(/[,\s，]+/).map((item) => item.trim()).filter(Boolean);
+            });
+            usersCell.append(usersInput);
+            row.append(usersCell);
+
+            const actionCell = document.createElement("td");
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "button button-danger";
+            removeButton.textContent = "删除";
+            removeButton.setAttribute("aria-label", "删除用户组 " + String(index + 1));
+            removeButton.addEventListener("click", () => {
+              config.user_groups.splice(index, 1);
+              renderUserGroups();
+            });
+            actionCell.append(removeButton);
+            row.append(actionCell);
+            userGroupsBody.append(row);
+          });
+        }
+
+        function renderGroupRules() {
+          groupRulesBody.replaceChildren();
+          if (!config.group_rules.length) {
+            const row = document.createElement("tr");
+            const cell = makeCell(row, "暂无群规则");
+            cell.className = "empty-row";
+            cell.colSpan = 3;
+            groupRulesBody.append(row);
+            return;
+          }
+          config.group_rules.forEach((rule, index) => {
+            const row = document.createElement("tr");
+            const groupCell = document.createElement("td");
+            const groupInput = makeInput(rule.group_id, "群号", "numeric");
+            groupInput.addEventListener("input", () => { rule.group_id = groupInput.value; });
+            groupCell.append(groupInput);
+            row.append(groupCell);
+
+            const limitCell = document.createElement("td");
+            const limitInput = makeLimitInput(rule.daily_limit, "群每日配额");
+            limitInput.addEventListener("input", () => { rule.daily_limit = readInteger(limitInput.value); });
+            limitCell.append(limitInput);
+            row.append(limitCell);
+
+            const actionCell = document.createElement("td");
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "button button-danger";
+            removeButton.textContent = "删除";
+            removeButton.setAttribute("aria-label", "删除群规则 " + String(index + 1));
+            removeButton.addEventListener("click", () => {
+              config.group_rules.splice(index, 1);
+              renderGroupRules();
+            });
+            actionCell.append(removeButton);
+            row.append(actionCell);
+            groupRulesBody.append(row);
+          });
+        }
+
+        function renderQuota() {
+          byId("reset-time").value = config.reset_time || "00:00";
+          byId("default-user-limit").value = config.default_user_limit == null ? "" : String(config.default_user_limit);
+          byId("default-group-limit").value = config.default_group_limit == null ? "" : String(config.default_group_limit);
+          renderUserGroups();
+          renderGroupRules();
+        }
+
+        function renderTextSettings() {
+          textSettingsRoot.replaceChildren();
+          textSections.forEach((section) => {
+            const card = document.createElement("section");
+            card.className = "card";
+            const heading = document.createElement("div");
+            heading.className = "card-heading";
+            const title = document.createElement("h2");
+            title.className = "text-section-heading";
+            title.textContent = section.title;
+            heading.append(title);
+            card.append(heading);
+
+            const grid = document.createElement("div");
+            grid.className = "template-grid";
+            section.fields.forEach(([key, label, , hint]) => {
+              const field = document.createElement("div");
+              field.className = "field";
+              const textareaId = "text-setting-" + key;
+              const labelElement = document.createElement("label");
+              labelElement.htmlFor = textareaId;
+              labelElement.textContent = label;
+              const textarea = document.createElement("textarea");
+              textarea.id = textareaId;
+              textarea.spellcheck = false;
+              textarea.value = config.text_settings[key] == null ? "" : String(config.text_settings[key]);
+              textarea.addEventListener("input", () => { config.text_settings[key] = textarea.value; });
+              const helper = document.createElement("p");
+              helper.className = "field-help";
+              helper.textContent = hint;
+              field.append(labelElement, textarea, helper);
+              grid.append(field);
+            });
+            card.append(grid);
+            textSettingsRoot.append(card);
+          });
+        }
+
+        function recordStatusLabel(status) {
+          if (status === "configured") return "已配置";
+          if (status === "unrecognized") return "类型未识别";
+          return "需要配置";
+        }
+
+        function recordSummary(record) {
+          const type = catalogByKind.get(record.kind);
+          const fallback = fallbackKinds.find(([key]) => key === record.kind);
+          const typeName = type ? type.label : (fallback ? fallback[1] : record.kind);
+          return typeName + " · " + (record.origin === "scan" ? "扫描发现" : "手动记录") +
+            " · " + recordStatusLabel(record.scan_status) +
+            (record.scan_note ? " · " + record.scan_note : "");
+        }
+
+        function providerDisplay(provider) {
+          const id = provider && provider.id != null ? String(provider.id) : "";
+          const model = provider && (provider.model || provider.api_base) ? String(provider.model || provider.api_base) : "";
+          return (model ? model + " · " : "") + (id || "未命名供应商");
+        }
+
+        function updateQueryControls() {
+          const allButton = byId("query-all-balances");
+          if (allButton) allButton.disabled = balanceDirty;
+          document.querySelectorAll(".balance-query-button").forEach((button) => {
+            button.disabled = balanceDirty;
+          });
+          if (balanceDirty) {
+            setStatus(byId("balance-query-status"), "余额设置有未保存的更改，请先保存再查询。", "warning");
+          }
+        }
+
+        function markManual(record) {
+          record.origin = "manual";
+          const template = catalogByKind.get(record.kind);
+          if (template && Array.isArray(template.input_fields)) {
+            const requiredFields = template.input_fields.filter((field) => field.required);
+            let missing = requiredFields.some((field) => {
+              const key = String(field.key || field.name || "");
+              const value = record.settings[key];
+              if (key === "api_key" && !String(value || "").trim() && record.credential_ref) return false;
+              if (key === "fields") {
+                return !value || typeof value !== "object" || !String(value["余额"] || "").trim();
+              }
+              return value == null || (typeof value === "string" && !value.trim());
+            });
+            const customKinds = ["custom", "custom_openai", "custom_anthropic"];
+            if (
+              customKinds.includes(record.kind) &&
+              record.settings.auth_mode !== "none" &&
+              !String(record.settings.api_key || "").trim() &&
+              !record.credential_ref
+            ) {
+              missing = true;
+            }
+            record.scan_status = missing ? "needs_configuration" : "configured";
+            record.scan_note = missing ? "请补全余额查询所需字段。" : "";
+          }
+          const recordCard = Array.from(balanceRecordsRoot.querySelectorAll(".record-card"))
+            .find((card) => card.dataset.recordId === record.id);
+          if (recordCard) {
+            const summary = recordCard.querySelector(".record-summary");
+            if (summary) summary.textContent = recordSummary(record);
+          }
+          balanceDirty = true;
+          balanceResults = [];
+          renderBalanceResults();
+          updateQueryControls();
+        }
+
+        function createField(labelText, hintText) {
+          const field = document.createElement("div");
+          field.className = "field";
+          const label = document.createElement("label");
+          label.textContent = labelText;
+          const helper = document.createElement("p");
+          helper.className = "field-help";
+          helper.textContent = hintText || "";
+          field.append(label);
+          return { field, label, helper };
+        }
+
+        function renderProviderBindings(record, parent) {
+          const wrapper = document.createElement("div");
+          wrapper.className = "field";
+          const label = document.createElement("span");
+          label.className = "field-label";
+          label.textContent = "绑定 AstrBot 供应商";
+          const list = document.createElement("div");
+          list.className = "provider-options";
+          const known = new Set(astrbotProviders.map((item) => String(item.id)));
+          const options = astrbotProviders.slice();
+          record.provider_ids.forEach((id) => {
+            if (!known.has(String(id))) options.push({ id: String(id), model: "当前列表中不存在" });
+          });
+          if (!options.length) {
+            const empty = document.createElement("p");
+            empty.className = "field-help";
+            empty.textContent = "没有可绑定的供应商；可刷新列表，或先在 AstrBot 中添加模型供应商。";
+            list.append(empty);
+          } else {
+            options.forEach((provider) => {
+              const id = String(provider.id);
+              const optionLabel = document.createElement("label");
+              optionLabel.className = "provider-choice";
+              const checkbox = document.createElement("input");
+              checkbox.type = "checkbox";
+              checkbox.checked = record.provider_ids.includes(id);
+              checkbox.addEventListener("change", () => {
+                const selected = new Set(record.provider_ids);
+                if (checkbox.checked) selected.add(id);
+                else selected.delete(id);
+                record.provider_ids = Array.from(selected);
+                markManual(record);
+              });
+              const text = document.createElement("span");
+              text.textContent = providerDisplay(provider);
+              optionLabel.append(checkbox, text);
+              list.append(optionLabel);
+            });
+          }
+          const helper = document.createElement("p");
+          helper.className = "field-help";
+          helper.textContent = "可多选。这里只保存 Provider ID，不读取或显示模型 Key。";
+          wrapper.append(label, list, helper);
+          parent.append(wrapper);
+        }
+
+        function supportsCredentialReference(kind) {
+          return ["deepseek", "kimi", "custom", "custom_openai", "custom_anthropic"].includes(kind);
+        }
+
+        function renderCredentialReference(record, parent) {
+          const wrapper = document.createElement("div");
+          wrapper.className = "field";
+          const label = document.createElement("label");
+          label.textContent = "单 Key 凭证引用";
+          const select = document.createElement("select");
+          select.setAttribute("aria-label", "单 Key 凭证引用");
+          const empty = document.createElement("option");
+          empty.value = "";
+          empty.textContent = "不引用";
+          select.append(empty);
+          const known = new Set(astrbotProviders.map((item) => String(item.id)));
+          const options = astrbotProviders.slice();
+          const selectedId = record.credential_ref || "";
+          if (selectedId && !known.has(selectedId)) options.push({ id: selectedId, model: "当前列表中不存在" });
+          options.forEach((provider) => {
+            const option = document.createElement("option");
+            option.value = String(provider.id);
+            option.textContent = providerDisplay(provider);
+            select.append(option);
+          });
+          select.value = selectedId;
+          select.disabled = !supportsCredentialReference(record.kind);
+          select.addEventListener("change", () => {
+            record.credential_ref = select.value;
+            markManual(record);
+          });
+          const helper = document.createElement("p");
+          helper.className = "field-help";
+          helper.textContent = supportsCredentialReference(record.kind)
+            ? "仅保存 Provider ID 引用，不复制其密钥；手动填写的 API Key 优先。"
+            : "此类型使用独立凭证，不能引用模型供应商 Key。";
+          wrapper.append(label, select, helper);
+          parent.append(wrapper);
+        }        function renderSettingFields(record, parent, template) {
+          const fields = template && Array.isArray(template.input_fields) ? template.input_fields : [];
+          if (!fields.length) {
+            const note = document.createElement("p");
+            note.className = "field-help";
+            note.textContent = "余额接口目录尚未提供此类型的设置字段。请刷新供应商列表后重试。";
+            parent.append(note);
+            return;
+          }
+          fields.forEach((definition) => {
+            const key = String(definition.key || definition.name || "");
+            if (!key) return;
+            if (!(key in record.settings) && definition.default !== undefined) {
+              record.settings[key] = definition.default;
+            }
+            const type = definition.type || "string";
+            const parts = createField(
+              String(definition.label || key) + (definition.required ? " *" : ""),
+              definition.hint || "",
+            );
+            let control;
+            if (type === "json") {
+              control = document.createElement("textarea");
+              control.className = "json-setting";
+              const value = record.settings[key] == null ? {} : record.settings[key];
+              control.value = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+              control.addEventListener("input", () => {
+                try {
+                  const parsed = JSON.parse(control.value);
+                  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+                    throw new Error("JSON 必须是对象");
+                  }
+                  record.settings[key] = parsed;
+                  control.removeAttribute("aria-invalid");
+                  markManual(record);
+                } catch {
+                  control.setAttribute("aria-invalid", "true");
+                }
+              });
+            } else if (type === "select") {
+              control = document.createElement("select");
+              (Array.isArray(definition.options) ? definition.options : []).forEach((value) => {
+                const option = document.createElement("option");
+                option.value = String(value);
+                option.textContent = String(value);
+                control.append(option);
+              });
+              control.value = String(record.settings[key] == null ? definition.default || "" : record.settings[key]);
+              control.addEventListener("change", () => {
+                record.settings[key] = control.value;
+                markManual(record);
+              });
+            } else {
+              control = document.createElement("input");
+              control.type = type === "secret" ? "password" : "text";
+              control.autocomplete = type === "secret" ? "new-password" : "off";
+              control.spellcheck = false;
+              control.value = record.settings[key] == null ? "" : String(record.settings[key]);
+              control.addEventListener("input", () => {
+                record.settings[key] = control.value;
+                markManual(record);
+              });
+            }
+            control.id = "balance-" + record.id + "-" + key;
+            control.setAttribute("aria-label", String(definition.label || key));
+            if (definition.required) control.required = true;
+            parts.label.htmlFor = control.id;
+            parts.field.append(control, parts.helper);
+            parent.append(parts.field);
+          });
+        }
+
+        function renderBalanceRecords() {
+          balanceRecordsRoot.replaceChildren();
+          if (!config.balance_providers.length) {
+            const card = document.createElement("div");
+            card.className = "card";
+            const title = document.createElement("h2");
+            title.textContent = "尚无余额记录";
+            const hint = document.createElement("p");
+            hint.className = "hint";
+            hint.textContent = "添加记录后填写查询凭证和接口设置。扫描只整理本地供应商信息，不会自动发起余额查询。";
+            card.append(title, hint);
+            balanceRecordsRoot.append(card);
+            updateQueryControls();
+            return;
+          }
+          config.balance_providers.forEach((record, index) => {
+            const article = document.createElement("article");
+            article.className = "record-card";
+            article.dataset.recordId = record.id;
+            const header = document.createElement("header");
+            header.className = "record-header";
+            const titleBlock = document.createElement("div");
+            const title = document.createElement("h3");
+            title.textContent = record.alias || "未命名余额记录";
+            const summary = document.createElement("p");
+            summary.className = "field-help record-summary";
+            summary.textContent = recordSummary(record);
+            titleBlock.append(title, summary);
+
+            const actions = document.createElement("div");
+            actions.className = "record-actions";
+            const query = document.createElement("button");
+            query.className = "button balance-query-button";
+            query.type = "button";
+            query.textContent = "查询";
+            query.addEventListener("click", () => queryBalanceRecord(record, query));
+            const remove = document.createElement("button");
+            remove.className = "button button-danger";
+            remove.type = "button";
+            remove.textContent = "删除";
+            remove.setAttribute("aria-label", "删除余额记录 " + String(index + 1));
+            remove.addEventListener("click", () => {
+              config.balance_providers.splice(index, 1);
+              balanceDirty = true;
+              balanceResults = balanceResults.filter((item) => item.id !== record.id);
+              renderBalanceRecords();
+              renderBalanceResults();
+            });
+            actions.append(query, remove);
+            header.append(titleBlock, actions);
+
+            const form = document.createElement("div");
+            form.className = "record-form";
+            const topFields = document.createElement("div");
+            topFields.className = "balance-fields";
+
+            const aliasParts = createField("别名 *", "必填、唯一、不能含空白；保留字：所有、当前、用量。");
+            const alias = document.createElement("input");
+            alias.type = "text";
+            alias.value = record.alias;
+            alias.autocomplete = "off";
+            alias.spellcheck = false;
+            alias.setAttribute("aria-label", "余额记录别名");
+            alias.addEventListener("input", () => {
+              record.alias = alias.value;
+              title.textContent = record.alias || "未命名余额记录";
+              markManual(record);
+            });
+            aliasParts.field.append(alias, aliasParts.helper);
+
+            const typeParts = createField("供应商类型", "");
+            const kindSelect = document.createElement("select");
+            kindSelect.setAttribute("aria-label", "余额供应商类型");
+            const kinds = catalog.length ? catalog.map((item) => [item.kind, item.label]) : fallbackKinds;
+            kinds.forEach(([kind, label]) => {
+              const option = document.createElement("option");
+              option.value = String(kind);
+              option.textContent = String(label);
+              kindSelect.append(option);
+            });
+            kindSelect.value = record.kind;
+            kindSelect.disabled = !catalog.length;
+            kindSelect.addEventListener("change", () => {
+              record.kind = kindSelect.value;
+              record.settings = defaultSettingsFor(record.kind);
+              if (!supportsCredentialReference(record.kind)) record.credential_ref = "";
+              record.scan_status = "needs_configuration";
+              record.scan_note = "";
+              markManual(record);
+              renderBalanceRecords();
+            });
+            typeParts.field.append(kindSelect, typeParts.helper);
+            topFields.append(aliasParts.field, typeParts.field);
+            renderCredentialReference(record, topFields);
+            form.append(topFields);
+
+            renderProviderBindings(record, form);
+            const settingsGrid = document.createElement("div");
+            settingsGrid.className = "balance-fields";
+            renderSettingFields(record, settingsGrid, catalogByKind.get(record.kind));
+            form.append(settingsGrid);
+            article.append(header, form);
+            balanceRecordsRoot.append(article);
+          });
+          updateQueryControls();
+        }
+
+        function renderBalanceResults() {
+          balanceResultsBody.replaceChildren();
+          if (!balanceResults.length) {
+            const row = document.createElement("tr");
+            const cell = makeCell(row, "查询结果会显示在这里。");
+            cell.className = "empty-row";
+            cell.colSpan = 5;
+            balanceResultsBody.append(row);
+            return;
+          }
+          balanceResults.forEach((result) => {
+            const record = config.balance_providers.find((item) => item.id === result.id);
+            const dataRows = Array.isArray(result.rows)
+              ? result.rows
+              : result.rows && typeof result.rows === "object"
+                ? [result.rows]
+                : [];
+            const rowsToDisplay = result.ok === true && dataRows.length ? dataRows : [{}];
+            rowsToDisplay.forEach((values) => {
+              const row = document.createElement("tr");
+              makeCell(row, result.alias || (record ? record.alias : "未命名"));
+              const rowValues = values && typeof values === "object" ? values : {};
+              const amount = Object.prototype.hasOwnProperty.call(rowValues, "余额") ? rowValues["余额"] : "—";
+              const currency = Object.prototype.hasOwnProperty.call(rowValues, "币种")
+                ? rowValues["币种"]
+                : record && record.settings && record.settings.currency
+                  ? record.settings.currency
+                  : "—";
+              makeCell(row, amount);
+              makeCell(row, currency);
+              const ok = result.ok === true;
+              const statusCell = makeCell(row, (ok ? "成功" : "失败") + (result.cached ? " · 缓存" : ""));
+              statusCell.className = ok ? "result-ok" : "result-error";
+              const details = [];
+              if (ok) {
+                Object.entries(rowValues).forEach(([key, value]) => {
+                  if (key !== "余额" && key !== "币种" && value != null && value !== "") {
+                    details.push(key + "：" + String(value));
+                  }
+                });
+              } else if (result.error) {
+                details.push(String(result.error));
+              } else if (result.error_code) {
+                details.push(String(result.error_code));
+              }
+              const detailCell = makeCell(row, details.join("；"));
+              if (!ok) detailCell.className = "result-error";
+              balanceResultsBody.append(row);
+            });
+          });
+        }
+
+        function renderConfig() {
+          renderQuota();
+          renderTextSettings();
+          renderBalanceRecords();
+          renderBalanceResults();
+        }
+
+        function formatCount(value) {
+          if (value == null || value === "") return "—";
+          const count = Number(value);
+          return Number.isFinite(count) ? String(count) : "—";
+        }
+
+        function quotaMode(item) {
+          if (item.mode === "blacklist" || (item.total != null && Number(item.total) === -1)) return "blacklist";
+          if (item.mode === "unlimited" || (item.total != null && Number(item.total) === 0)) return "unlimited";
+          return "limited";
+        }
+
+        function formatQuotaTotal(item) {
+          const mode = quotaMode(item);
+          if (mode === "blacklist") return "黑名单";
+          if (mode === "unlimited") return "不限额";
+          return formatCount(item.total);
+        }
+
+        function formatRemaining(item) {
+          const mode = quotaMode(item);
+          if (mode === "blacklist") return "0";
+          if (mode === "unlimited") return "不限额";
+          return formatCount(item.remaining);
+        }        function formatBeijingDateTime(value) {
+          if (value == null || value === "") return "—";
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return String(value);
+          try {
+            return new Intl.DateTimeFormat("zh-CN", {
+              timeZone: "Asia/Shanghai",
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              hourCycle: "h23",
+            }).format(date);
+          } catch {
+            return String(value);
+          }
+        }
+
+        function formatPeriod(value) {
+          if (value == null || value === "") return "—";
+          const period = String(value);
+          return period.includes("T") ? formatBeijingDateTime(period) : period;
+        }
+
+        function renderUsage(rows) {
+          usageRowsBody.replaceChildren();
+          if (!rows.length) {
+            const row = document.createElement("tr");
+            const cell = makeCell(row, "暂无用量记录");
+            cell.className = "empty-row";
+            cell.colSpan = 9;
+            usageRowsBody.append(row);
+            return;
+          }
+          rows.forEach((item) => {
+            const row = document.createElement("tr");
+            makeCell(row, item.platform_id == null ? "—" : String(item.platform_id));
+            const kindLabel = item.kind === "private"
+              ? "私聊"
+              : item.kind === "group"
+                ? "群聊"
+                : item.kind == null
+                  ? "—"
+                  : String(item.kind);
+            makeCell(row, kindLabel);
+            makeCell(row, item.target_id == null ? "—" : String(item.target_id));
+            makeCell(row, formatPeriod(item.period));
+            makeCell(row, formatCount(item.used));
+            makeCell(row, formatQuotaTotal(item));
+            makeCell(row, formatCount(item.reserved));
+            makeCell(row, formatRemaining(item));
+            makeCell(row, formatBeijingDateTime(item.reset_at));
+            usageRowsBody.append(row);
+          });
+        }
+
+        async function loadConfig() {
+          const response = await bridge.apiGet("config");
+          config = normalizedConfigFromResponse(response);
+          balanceDirty = false;
+          balanceResults = [];
+          renderConfig();
+        }
+
+        async function loadBalanceCatalog() {
+          const response = await bridge.apiGet("balance/catalog");
+          catalog = Array.isArray(response && response.catalog) ? response.catalog : [];
+          catalogByKind = new Map(catalog.map((item) => [String(item.kind), item]));
+          astrbotProviders = Array.isArray(response && response.providers)
+            ? response.providers.filter((item) => item && item.id != null)
+            : [];
+          if (!catalog.length) throw new Error("服务器没有返回余额供应商类型目录");
+          if (config) renderBalanceRecords();
+          setStatus(
+            balanceCatalogStatus,
+            "已加载 " + String(astrbotProviders.length) + " 个 AstrBot 供应商；余额查询类型 " + String(catalog.length) + " 种。",
+            "success",
+          );
+        }
+
+        async function reloadConfig() {
+          if (!bridge) return;
+          reloadConfigButton.disabled = true;
+          setStatus(saveStatus, "正在读取已保存的设置…", "");
+          try {
+            await loadConfig();
+            try {
+              await loadBalanceCatalog();
+            } catch (catalogError) {
+              setStatus(balanceCatalogStatus, catalogError && catalogError.message ? catalogError.message : "读取余额供应商目录失败", "error");
+            }
+            setStatus(saveStatus, "已重新读取已保存的设置。", "success");
+          } catch (error) {
+            setStatus(saveStatus, error && error.message ? error.message : "读取设置失败", "error");
+          } finally {
+            reloadConfigButton.disabled = false;
+          }
+        }
+
+        async function refreshUsage() {
+          const buttons = [byId("refresh-usage"), byId("refresh-usage-card")];
+          buttons.forEach((button) => { button.disabled = true; });
+          try {
+            const response = await bridge.apiGet("usage");
+            const rows = response && Array.isArray(response.usage) ? response.usage : [];
+            renderUsage(rows);
+            setStatus(usageStatus, "已更新", "");
+          } catch (error) {
+            setStatus(usageStatus, error && error.message ? error.message : "读取用量失败", "error");
+          } finally {
+            buttons.forEach((button) => { button.disabled = false; });
+          }
+        }
+
+        function validateBalanceConfig() {
+          const invalidJson = Array.from(document.querySelectorAll(".json-setting[aria-invalid='true']"));
+          if (invalidJson.length) {
+            invalidJson[0].focus();
+            return "JSON 设置格式无效，请修正后再保存。";
+          }
+          const seen = new Set();
+          for (const record of config.balance_providers) {
+            const alias = String(record.alias || "");
+            if (!alias || /\s/u.test(alias)) return "余额记录别名必填且不能包含空白字符。";
+            if (reservedAliases.has(alias)) return "“所有”“当前”“用量”是命令保留字，不能用作别名。";
+            const uniqueKey = alias.toLowerCase();
+            if (seen.has(uniqueKey)) return "余额记录别名必须唯一：" + alias;
+            seen.add(uniqueKey);
+          }
+          return "";
+        }
+
+        function statusForScope(scope) {
+          if (scope === "balance") return balanceSaveStatus;
+          if (scope === "text") return textSaveStatus;
+          return saveStatus;
+        }
+
+        async function saveConfig(scope) {
+          if (!config) return;
+          config.reset_time = byId("reset-time").value;
+          config.default_user_limit = readInteger(byId("default-user-limit").value);
+          config.default_group_limit = readInteger(byId("default-group-limit").value);
+          const invalidLimit = (value) => !Number.isSafeInteger(value) || value < -1;
+          if (
+            invalidLimit(config.default_user_limit) ||
+            invalidLimit(config.default_group_limit) ||
+            config.user_groups.some((group) => invalidLimit(group.daily_limit)) ||
+            config.group_rules.some((rule) => invalidLimit(rule.daily_limit))
+          ) {
+            setStatus(statusForScope(scope), "每日配额必须填写整数：-1 表示黑名单，0 表示不限额，正整数表示次数。", "error");
+            return;
+          }
+          if (scope === "balance") {
+            const error = validateBalanceConfig();
+            if (error) {
+              setStatus(balanceSaveStatus, error, "error");
+              return;
+            }
+          }
+          saveButtons.forEach((button) => { button.disabled = true; });
+          setStatus(statusForScope(scope), "正在保存全部设置…", "");
+          try {
+            const response = await bridge.apiPost("config", config);
+            config = normalizedConfigFromResponse(response);
+            balanceDirty = false;
+            balanceResults = [];
+            renderConfig();
+            setStatus(statusForScope(scope), "已保存全部设置。", "success");
+            await refreshUsage();
+          } catch (error) {
+            setStatus(statusForScope(scope), error && error.message ? error.message : "保存设置失败", "error");
+          } finally {
+            saveButtons.forEach((button) => { button.disabled = false; });
+          }
+        }
+
+        async function scanBalanceProviders() {
+          const button = byId("scan-balance");
+          if (!config) return;
+          const invalidConfig = validateBalanceConfig();
+          if (invalidConfig) {
+            setStatus(balanceScanStatus, "扫描前请修正：" + invalidConfig, "error");
+            return;
+          }
+          button.disabled = true;
+          setStatus(balanceScanStatus, "正在读取本地供应商配置…", "");
+          try {
+            const response = await bridge.apiPost("balance/scan", {
+              balance_providers: config.balance_providers,
+            });
+            if (
+              !response ||
+              !Array.isArray(response.added) ||
+              !Array.isArray(response.updated) ||
+              !Array.isArray(response.needs_configuration)
+            ) {
+              throw new Error("扫描响应不完整，未能确认结果数量");
+            }
+            const nextConfig = normalizedConfigFromResponse(response);
+            config.balance_providers = nextConfig.balance_providers;
+            balanceDirty = false;
+            balanceResults = [];
+            renderBalanceRecords();
+            renderBalanceResults();
+            const added = response.added;
+            const updated = response.updated;
+            const needs = response.needs_configuration;
+            const names = (items) => items.map((item) => item && item.alias ? String(item.alias) : "未命名").join("、");
+            let summary = "扫描完成：新增 " + String(added.length) + "，更新 " +
+              String(updated.length) + "，需要配置 " + String(needs.length) + "。";
+            if (added.length) summary += " 新增：" + names(added) + "。";
+            if (updated.length) summary += " 更新：" + names(updated) + "。";
+            if (needs.length) summary += " 待配置：" + names(needs) + "。";
+            setStatus(balanceScanStatus, summary, needs.length ? "warning" : "success");
+          } catch (error) {
+            setStatus(balanceScanStatus, "扫描失败：" + (error && error.message ? error.message : "接口不可用"), "error");
+          } finally {
+            button.disabled = false;
+          }
+        }        function addBalanceRecord() {
+          if (!config || !catalog.length) {
+            setStatus(balanceCatalogStatus, "余额供应商类型目录尚未加载，请先刷新供应商列表。", "error");
+            return;
+          }
+          const template = catalog.find((item) => item.kind === "deepseek") || catalog[0];
+          const kind = String(template.kind);
+          config.balance_providers.push({
+            id: newId(),
+            alias: "",
+            kind: kind,
+            provider_ids: [],
+            credential_ref: "",
+            settings: defaultSettingsFor(kind),
+            origin: "manual",
+            scan_status: "needs_configuration",
+            scan_note: "",
+          });
+          balanceDirty = true;
+          balanceResults = [];
+          renderBalanceRecords();
+          renderBalanceResults();
+          const inputs = balanceRecordsRoot.querySelectorAll("input[aria-label='余额记录别名']");
+          if (inputs.length) inputs[inputs.length - 1].focus();
+        }
+
+        function acceptBalanceResults(results, replace) {
+          if (replace) {
+            balanceResults = results.slice();
+          } else {
+            results.forEach((result) => {
+              balanceResults = balanceResults.filter((existing) => existing.id !== result.id);
+              balanceResults.push(result);
+            });
+          }
+          renderBalanceResults();
+        }
+
+        async function queryBalanceRecord(record, button) {
+          if (balanceDirty) {
+            updateQueryControls();
+            return;
+          }
+          button.disabled = true;
+          setStatus(byId("balance-query-status"), "正在查询“" + (record.alias || "未命名") + "”…", "");
+          try {
+            const response = await bridge.apiPost("balance/query", { id: record.id });
+            if (!response || !Array.isArray(response.results)) throw new Error("查询响应格式无效");
+            acceptBalanceResults(response.results, false);
+            const failed = response.results.some((item) => item.ok !== true);
+            setStatus(
+              byId("balance-query-status"),
+              failed ? "已完成，失败记录的错误已分别显示。" : "查询完成。",
+              failed ? "warning" : "success",
+            );
+          } catch (error) {
+            setStatus(
+              byId("balance-query-status"),
+              "查询失败：" + (error && error.message ? error.message : "余额查询接口不可用"),
+              "error",
+            );
+          } finally {
+            button.disabled = balanceDirty;
+          }
+        }
+
+        async function queryAllBalances() {
+          if (balanceDirty) {
+            updateQueryControls();
+            return;
+          }
+          const button = byId("query-all-balances");
+          button.disabled = true;
+          setStatus(byId("balance-query-status"), "正在查询全部余额…", "");
+          try {
+            const response = await bridge.apiPost("balance/query", { all: true });
+            if (!response || !Array.isArray(response.results)) throw new Error("查询响应格式无效");
+            acceptBalanceResults(response.results, true);
+            const failed = response.results.some((item) => item.ok !== true);
+            setStatus(
+              byId("balance-query-status"),
+              failed ? "查询完成，失败供应商已分别列出。" : "全部查询完成。",
+              failed ? "warning" : "success",
+            );
+          } catch (error) {
+            setStatus(
+              byId("balance-query-status"),
+              "查询失败：" + (error && error.message ? error.message : "余额查询接口不可用"),
+              "error",
+            );
+          } finally {
+            button.disabled = balanceDirty;
+          }
+        }
+
+        byId("add-user-group").addEventListener("click", () => {
+          if (!config) return;
+          config.user_groups.push({ id: newId(), name: "", daily_limit: 70, user_ids: [] });
+          renderUserGroups();
+        });
+
+        byId("add-group-rule").addEventListener("click", () => {
+          if (!config) return;
+          config.group_rules.push({ group_id: "", daily_limit: 200 });
+          renderGroupRules();
+        });
+
+        byId("reset-time").addEventListener("input", (event) => {
+          if (config) config.reset_time = event.currentTarget.value;
+        });
+        byId("default-user-limit").addEventListener("input", (event) => {
+          if (config) config.default_user_limit = readInteger(event.currentTarget.value);
+        });
+        byId("default-group-limit").addEventListener("input", (event) => {
+          if (config) config.default_group_limit = readInteger(event.currentTarget.value);
+        });
+
+        saveButtons.forEach((button) => {
+          button.addEventListener("click", () => saveConfig(button.dataset.saveScope || "quota"));
+        });
+        byId("refresh-usage").addEventListener("click", refreshUsage);
+        byId("refresh-usage-card").addEventListener("click", refreshUsage);
+        reloadConfigButton.addEventListener("click", reloadConfig);
+        byId("reload-balance-catalog").addEventListener("click", async () => {
+          const button = byId("reload-balance-catalog");
+          button.disabled = true;
+          setStatus(balanceCatalogStatus, "正在加载供应商目录…", "");
+          try {
+            await loadBalanceCatalog();
+          } catch (error) {
+            setStatus(balanceCatalogStatus, error && error.message ? error.message : "读取余额供应商目录失败", "error");
+          } finally {
+            button.disabled = false;
+          }
+        });
+        byId("scan-balance").addEventListener("click", scanBalanceProviders);
+        byId("add-balance-record").addEventListener("click", addBalanceRecord);
+        byId("query-all-balances").addEventListener("click", queryAllBalances);
+
+        document.querySelectorAll('[role="tab"]').forEach((tab) => {
+          tab.addEventListener("click", () => {
+            document.querySelectorAll('[role="tab"]').forEach((candidate) => {
+              candidate.setAttribute("aria-selected", candidate === tab ? "true" : "false");
+            });
+            document.querySelectorAll('[role="tabpanel"]').forEach((panel) => {
+              panel.hidden = panel.id !== tab.getAttribute("aria-controls");
+            });
+          });
+        });
+
+        async function initialize() {
+          if (!bridge) {
+            setStatus(saveStatus, "页面桥接接口不可用，请从 AstrBot 插件页重新打开。", "error");
+            return;
+          }
+          try {
+            await bridge.ready();
+            await loadConfig();
+          } catch (error) {
+            setStatus(saveStatus, error && error.message ? error.message : "加载配额配置失败", "error");
+            return;
+          }
+          try {
+            await loadBalanceCatalog();
+          } catch (error) {
+            setStatus(balanceCatalogStatus, error && error.message ? error.message : "读取余额供应商目录失败", "error");
+          }
+          await refreshUsage();
+        }
+
+        initialize();
+      })();
+    </script>
+  </body>
+</html>

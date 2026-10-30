@@ -1,0 +1,722 @@
+{
+  "metadata": {
+    "display_name": "更好的额度管理",
+    "short_desc": "管理 NEWAPI 网关配额、供应商余额与 Token 用量。",
+    "desc": "设置每日配额和余额供应商，编辑查询文本并查看用量。"
+  },
+  "views": {
+    "management": {
+      "title": "更好的额度管理",
+      "description": "管理每日配额、余额供应商和回复文本。"
+    }
+  },
+  "config": {
+    "schema_version": {
+      "description": "内部配置版本"
+    },
+    "time_zone": {
+      "description": "配额时区"
+    },
+    "reset_time": {
+      "description": "每日重置时间",
+      "hint": "使用北京时间（Asia/Shanghai）。修改重置时间会保留本期已用次数，并在下一个设定时刻重置。需要表格化设置和用量查看，可前往左侧“拓展功能 → 更好的额度管理”。"
+    },
+    "default_user_limit": {
+      "description": "默认私聊每日配额",
+      "hint": "-1 表示黑名单并阻止 LLM 请求；0 表示不限额；大于 0 表示每日一轮成功发送的 LLM 回复次数。"
+    },
+    "default_group_limit": {
+      "description": "默认群聊每日配额",
+      "hint": "群内成员共享配额。-1 表示黑名单并阻止 LLM 请求；0 表示不限额；大于 0 表示每日一轮成功发送的 LLM 回复次数。"
+    },
+    "user_groups": {
+      "description": "私聊用户组",
+      "hint": "每个 QQ 号最多属于一个组；组成员各自使用该组配额。",
+      "templates": {
+        "user_group": {
+          "name": "用户组",
+          "hint": "为一组私聊用户设置独立配额。",
+          "items": {
+            "id": {
+              "description": "用户组标识",
+              "hint": "组内保持唯一；图形化设置会自动生成。"
+            },
+            "name": {
+              "description": "用户组名称"
+            },
+            "daily_limit": {
+              "description": "每日配额",
+              "hint": "-1 黑名单；0 不限额；正整数表示每日一轮成功发送的 LLM 回复次数。"
+            },
+            "user_ids": {
+              "description": "QQ 号列表",
+              "hint": "填写纯数字 QQ 号；每人最多属于一个用户组。"
+            }
+          }
+        }
+      }
+    },
+    "group_rules": {
+      "description": "群聊配额规则",
+      "hint": "为指定群单独设置每日共享配额；未列出的群使用默认群聊配额。",
+      "templates": {
+        "group_rule": {
+          "name": "群聊规则",
+          "hint": "一条规则对应一个 QQ 群。",
+          "items": {
+            "group_id": {
+              "description": "群号",
+              "hint": "填写纯数字 QQ 群号；每个群只能配置一条规则。"
+            },
+            "daily_limit": {
+              "description": "每日配额",
+              "hint": "-1 黑名单；0 不限额；正整数表示群内共享的一轮成功发送的 LLM 回复次数。"
+            }
+          }
+        }
+      }
+    },
+    "text_settings": {
+      "description": "命令和余额查询回复文本",
+      "hint": "图形化管理页与此对象共用配置。占位符仅支持字段提示中列出的名称，不支持任意格式表达式。",
+      "items": {
+        "quota_reply": {
+          "description": "私聊有限额回复",
+          "hint": "仅支持 {used}（已用次数）和 {total}（每日配额）；不要使用其他格式表达式。"
+        },
+        "unlimited_reply": {
+          "description": "私聊不限额回复",
+          "hint": "仅支持 {used} 和 {total}；不要使用其他格式表达式。"
+        },
+        "group_quota_reply": {
+          "description": "群聊有限额回复",
+          "hint": "仅支持 {used}（本群已用次数）和 {total}（本群配额）；不要使用其他格式表达式。"
+        },
+        "group_unlimited_reply": {
+          "description": "群聊不限额回复",
+          "hint": "仅支持 {used} 和 {total}；不要使用其他格式表达式。"
+        },
+        "blacklist_reply": {
+          "description": "黑名单回复",
+          "hint": "支持 {used} 和 {total}；不要使用其他格式表达式。"
+        },
+        "exhausted_reply": {
+          "description": "配额耗尽回复",
+          "hint": "支持 {used} 和 {total}；不要使用其他格式表达式。"
+        },
+        "balance_deepseek": {
+          "description": "DeepSeek 余额回复",
+          "hint": "支持 {别名}、{余额}、{币种}、{赠送余额}、{充值余额}；不要使用其他格式表达式。"
+        },
+        "balance_kimi": {
+          "description": "Kimi 余额回复",
+          "hint": "支持 {别名}、{余额}、{币种}、{代金券余额}、{现金余额}；不要使用其他格式表达式。"
+        },
+        "balance_openrouter": {
+          "description": "OpenRouter 余额回复",
+          "hint": "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"
+        },
+        "balance_aliyun": {
+          "description": "阿里云 BSS 余额回复",
+          "hint": "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"
+        },
+        "balance_volcengine": {
+          "description": "火山引擎余额回复",
+          "hint": "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"
+        },
+        "balance_custom": {
+          "description": "自定义服务余额回复",
+          "hint": "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"
+        },
+        "balance_all_failure": {
+          "description": "全部余额查询失败回复",
+          "hint": "支持 {别名} 和 {错误}；不要使用其他格式表达式。"
+        },
+        "balance_failure": {
+          "description": "单项余额查询失败回复",
+          "hint": "支持 {别名} 和 {错误}；不要使用其他格式表达式。"
+        },
+        "balance_not_found": {
+          "description": "未找到余额记录回复",
+          "hint": "支持 {别名}；不要使用其他格式表达式。"
+        },
+        "balance_unbound": {
+          "description": "当前供应商未绑定回复",
+          "hint": "此文本不接受占位符。"
+        },
+        "balance_empty": {
+          "description": "余额记录为空回复",
+          "hint": "此文本不接受占位符。"
+        },
+        "balance_usage_hint": {
+          "description": "Token 用量命令提示",
+          "hint": "支持 {前缀}；不要使用其他格式表达式。"
+        },
+        "usage_reply": {
+          "description": "Token 用量回复",
+          "hint": "支持 {时间} 和 {token}；不要使用其他格式表达式。"
+        },
+        "usage_failure": {
+          "description": "Token 用量失败回复",
+          "hint": "此文本不接受占位符。"
+        },
+        "help_reply": {
+          "description": "帮助回复",
+          "hint": "支持 {命令列表}；不要使用其他格式表达式。"
+        }
+      }
+    },
+    "balance_providers": {
+      "description": "余额查询供应商记录",
+      "hint": "自定义兼容服务必须填写真实余额 URL。扫描只识别本地 AstrBot 供应商配置，不发起余额请求。",
+      "templates": {
+        "deepseek": {
+          "name": "DeepSeek",
+          "hint": "每条记录对应一个余额查询接口。secret 字段使用密码输入框，扫描不会复制模型供应商密钥。",
+          "items": {
+            "id": {
+              "description": "记录标识"
+            },
+            "alias": {
+              "description": "别名",
+              "hint": "必填且唯一；不得包含空白字符；保留字：所有、当前、用量。"
+            },
+            "kind": {
+              "description": "类型"
+            },
+            "provider_ids": {
+              "description": "绑定的 AstrBot 供应商 ID",
+              "hint": "可多选供应商；绑定仅按 ID 保存，不读取或显示供应商密钥。"
+            },
+            "credential_ref": {
+              "description": "单 Key 凭证引用",
+              "hint": "仅 DeepSeek、Kimi 和自定义类型可引用现有 AstrBot 单 Key Provider ID；手填 API Key 优先。只保存引用，不复制或显示模型供应商密钥。OpenRouter Management Key 与云账号 AK 必须单独填写。"
+            },
+            "settings": {
+              "description": "余额接口设置",
+              "items": {
+                "url": {
+                  "description": "余额查询 URL",
+                  "hint": "DeepSeek 余额接口；如服务端变更可调整。"
+                },
+                "api_key": {
+                  "description": "API Key",
+                  "hint": "手动填写此余额查询凭证；不会从 AstrBot 模型供应商复制密钥。"
+                },
+                "currency": {
+                  "description": "币种覆盖",
+                  "hint": "留空时使用接口返回的币种。"
+                }
+              }
+            },
+            "origin": {
+              "description": "记录来源"
+            },
+            "scan_status": {
+              "description": "扫描状态"
+            },
+            "scan_note": {
+              "description": "扫描说明"
+            }
+          }
+        },
+        "kimi": {
+          "name": "Kimi（月之暗面）",
+          "hint": "每条记录对应一个余额查询接口。secret 字段使用密码输入框，扫描不会复制模型供应商密钥。",
+          "items": {
+            "id": {
+              "description": "记录标识"
+            },
+            "alias": {
+              "description": "别名",
+              "hint": "必填且唯一；不得包含空白字符；保留字：所有、当前、用量。"
+            },
+            "kind": {
+              "description": "类型"
+            },
+            "provider_ids": {
+              "description": "绑定的 AstrBot 供应商 ID",
+              "hint": "可多选供应商；绑定仅按 ID 保存，不读取或显示供应商密钥。"
+            },
+            "credential_ref": {
+              "description": "单 Key 凭证引用",
+              "hint": "仅 DeepSeek、Kimi 和自定义类型可引用现有 AstrBot 单 Key Provider ID；手填 API Key 优先。只保存引用，不复制或显示模型供应商密钥。OpenRouter Management Key 与云账号 AK 必须单独填写。"
+            },
+            "settings": {
+              "description": "余额接口设置",
+              "items": {
+                "url": {
+                  "description": "余额查询 URL",
+                  "hint": "Kimi 余额接口；如服务端变更可调整。"
+                },
+                "api_key": {
+                  "description": "API Key",
+                  "hint": "手动填写此余额查询凭证；不会从 AstrBot 模型供应商复制密钥。"
+                },
+                "currency": {
+                  "description": "币种覆盖",
+                  "hint": "可按接口返回情况调整。"
+                }
+              }
+            },
+            "origin": {
+              "description": "记录来源"
+            },
+            "scan_status": {
+              "description": "扫描状态"
+            },
+            "scan_note": {
+              "description": "扫描说明"
+            }
+          }
+        },
+        "openrouter": {
+          "name": "OpenRouter",
+          "hint": "每条记录对应一个余额查询接口。secret 字段使用密码输入框，扫描不会复制模型供应商密钥。",
+          "items": {
+            "id": {
+              "description": "记录标识"
+            },
+            "alias": {
+              "description": "别名",
+              "hint": "必填且唯一；不得包含空白字符；保留字：所有、当前、用量。"
+            },
+            "kind": {
+              "description": "类型"
+            },
+            "provider_ids": {
+              "description": "绑定的 AstrBot 供应商 ID",
+              "hint": "可多选供应商；绑定仅按 ID 保存，不读取或显示供应商密钥。"
+            },
+            "credential_ref": {
+              "description": "单 Key 凭证引用",
+              "hint": "仅 DeepSeek、Kimi 和自定义类型可引用现有 AstrBot 单 Key Provider ID；手填 API Key 优先。只保存引用，不复制或显示模型供应商密钥。OpenRouter Management Key 与云账号 AK 必须单独填写。"
+            },
+            "settings": {
+              "description": "余额接口设置",
+              "items": {
+                "url": {
+                  "description": "余额查询 URL",
+                  "hint": "OpenRouter 额度接口。"
+                },
+                "api_key": {
+                  "description": "Management Key",
+                  "hint": "需要 OpenRouter Management Key；扫描到的模型凭证不能替代它。"
+                },
+                "currency": {
+                  "description": "币种覆盖",
+                  "hint": "可按接口返回情况调整。"
+                }
+              }
+            },
+            "origin": {
+              "description": "记录来源"
+            },
+            "scan_status": {
+              "description": "扫描状态"
+            },
+            "scan_note": {
+              "description": "扫描说明"
+            }
+          }
+        },
+        "aliyun": {
+          "name": "阿里云 BSS",
+          "hint": "每条记录对应一个余额查询接口。secret 字段使用密码输入框，扫描不会复制模型供应商密钥。",
+          "items": {
+            "id": {
+              "description": "记录标识"
+            },
+            "alias": {
+              "description": "别名",
+              "hint": "必填且唯一；不得包含空白字符；保留字：所有、当前、用量。"
+            },
+            "kind": {
+              "description": "类型"
+            },
+            "provider_ids": {
+              "description": "绑定的 AstrBot 供应商 ID",
+              "hint": "可多选供应商；绑定仅按 ID 保存，不读取或显示供应商密钥。"
+            },
+            "credential_ref": {
+              "description": "单 Key 凭证引用",
+              "hint": "仅 DeepSeek、Kimi 和自定义类型可引用现有 AstrBot 单 Key Provider ID；手填 API Key 优先。只保存引用，不复制或显示模型供应商密钥。OpenRouter Management Key 与云账号 AK 必须单独填写。"
+            },
+            "settings": {
+              "description": "余额接口设置",
+              "items": {
+                "access_key_id": {
+                  "description": "Access Key ID",
+                  "hint": "余额查询专用云账号访问标识。"
+                },
+                "access_key_secret": {
+                  "description": "Access Key Secret",
+                  "hint": "手动填写；不会从 AstrBot 模型供应商复制密钥。"
+                },
+                "region": {
+                  "description": "区域",
+                  "hint": "签名使用的云区域。"
+                },
+                "currency": {
+                  "description": "币种覆盖",
+                  "hint": "可按接口返回情况调整。"
+                }
+              }
+            },
+            "origin": {
+              "description": "记录来源"
+            },
+            "scan_status": {
+              "description": "扫描状态"
+            },
+            "scan_note": {
+              "description": "扫描说明"
+            }
+          }
+        },
+        "volcengine": {
+          "name": "火山引擎",
+          "hint": "每条记录对应一个余额查询接口。secret 字段使用密码输入框，扫描不会复制模型供应商密钥。",
+          "items": {
+            "id": {
+              "description": "记录标识"
+            },
+            "alias": {
+              "description": "别名",
+              "hint": "必填且唯一；不得包含空白字符；保留字：所有、当前、用量。"
+            },
+            "kind": {
+              "description": "类型"
+            },
+            "provider_ids": {
+              "description": "绑定的 AstrBot 供应商 ID",
+              "hint": "可多选供应商；绑定仅按 ID 保存，不读取或显示供应商密钥。"
+            },
+            "credential_ref": {
+              "description": "单 Key 凭证引用",
+              "hint": "仅 DeepSeek、Kimi 和自定义类型可引用现有 AstrBot 单 Key Provider ID；手填 API Key 优先。只保存引用，不复制或显示模型供应商密钥。OpenRouter Management Key 与云账号 AK 必须单独填写。"
+            },
+            "settings": {
+              "description": "余额接口设置",
+              "items": {
+                "access_key_id": {
+                  "description": "Access Key ID",
+                  "hint": "余额查询专用云账号访问标识。"
+                },
+                "access_key_secret": {
+                  "description": "Access Key Secret",
+                  "hint": "手动填写；不会从 AstrBot 模型供应商复制密钥。"
+                },
+                "region": {
+                  "description": "区域",
+                  "hint": "签名使用的云区域。"
+                },
+                "currency": {
+                  "description": "币种覆盖",
+                  "hint": "可按接口返回情况调整。"
+                }
+              }
+            },
+            "origin": {
+              "description": "记录来源"
+            },
+            "scan_status": {
+              "description": "扫描状态"
+            },
+            "scan_note": {
+              "description": "扫描说明"
+            }
+          }
+        },
+        "custom_openai": {
+          "name": "自定义（OpenAI 来源）",
+          "hint": "每条记录对应一个余额查询接口。secret 字段使用密码输入框，扫描不会复制模型供应商密钥。",
+          "items": {
+            "id": {
+              "description": "记录标识"
+            },
+            "alias": {
+              "description": "别名",
+              "hint": "必填且唯一；不得包含空白字符；保留字：所有、当前、用量。"
+            },
+            "kind": {
+              "description": "类型"
+            },
+            "provider_ids": {
+              "description": "绑定的 AstrBot 供应商 ID",
+              "hint": "可多选供应商；绑定仅按 ID 保存，不读取或显示供应商密钥。"
+            },
+            "credential_ref": {
+              "description": "单 Key 凭证引用",
+              "hint": "仅 DeepSeek、Kimi 和自定义类型可引用现有 AstrBot 单 Key Provider ID；手填 API Key 优先。只保存引用，不复制或显示模型供应商密钥。OpenRouter Management Key 与云账号 AK 必须单独填写。"
+            },
+            "settings": {
+              "description": "余额接口设置",
+              "items": {
+                "url": {
+                  "description": "余额查询 URL",
+                  "hint": "自定义兼容服务的真实余额接口 URL 需由你填写；插件不会自动拼出 OpenAI 或 Anthropic 的余额接口。"
+                },
+                "method": {
+                  "description": "HTTP 方法",
+                  "hint": "选择 GET 或 POST。"
+                },
+                "api_key": {
+                  "description": "API Key",
+                  "hint": "按认证方式手动填写；密钥不会从 AstrBot 模型供应商复制。"
+                },
+                "auth_mode": {
+                  "description": "认证方式",
+                  "hint": "none 不发送 API Key；bearer 使用 Bearer 认证；header 将 API Key 放入指定请求头。"
+                },
+                "auth_header": {
+                  "description": "认证请求头名称",
+                  "hint": "auth_mode 选择 header 时使用。"
+                },
+                "headers": {
+                  "description": "额外请求头 JSON",
+                  "hint": "输入 JSON 对象；只支持静态键值，不支持表达式。"
+                },
+                "body": {
+                  "description": "POST 请求体 JSON",
+                  "hint": "输入 JSON 对象；只支持静态键值，不支持表达式。GET 请求不会发送请求体。"
+                },
+                "fields": {
+                  "description": "响应字段 JSON Pointer 映射",
+                  "hint": "至少填写“余额”路径；其余字段可选。例：响应 {\"data\":{\"balance\":12.5}} 对应 /data/balance。路径按 JSON Pointer 读取，不执行任意表达式。",
+                  "items": {
+                    "余额": {
+                      "description": "余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。 余额为必填。"
+                    },
+                    "币种": {
+                      "description": "币种 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "赠送余额": {
+                      "description": "赠送余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "充值余额": {
+                      "description": "充值余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "代金券余额": {
+                      "description": "代金券余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "现金余额": {
+                      "description": "现金余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    }
+                  }
+                }
+              }
+            },
+            "origin": {
+              "description": "记录来源"
+            },
+            "scan_status": {
+              "description": "扫描状态"
+            },
+            "scan_note": {
+              "description": "扫描说明"
+            }
+          }
+        },
+        "custom_anthropic": {
+          "name": "自定义（Anthropic 来源）",
+          "hint": "每条记录对应一个余额查询接口。secret 字段使用密码输入框，扫描不会复制模型供应商密钥。",
+          "items": {
+            "id": {
+              "description": "记录标识"
+            },
+            "alias": {
+              "description": "别名",
+              "hint": "必填且唯一；不得包含空白字符；保留字：所有、当前、用量。"
+            },
+            "kind": {
+              "description": "类型"
+            },
+            "provider_ids": {
+              "description": "绑定的 AstrBot 供应商 ID",
+              "hint": "可多选供应商；绑定仅按 ID 保存，不读取或显示供应商密钥。"
+            },
+            "credential_ref": {
+              "description": "单 Key 凭证引用",
+              "hint": "仅 DeepSeek、Kimi 和自定义类型可引用现有 AstrBot 单 Key Provider ID；手填 API Key 优先。只保存引用，不复制或显示模型供应商密钥。OpenRouter Management Key 与云账号 AK 必须单独填写。"
+            },
+            "settings": {
+              "description": "余额接口设置",
+              "items": {
+                "url": {
+                  "description": "余额查询 URL",
+                  "hint": "自定义兼容服务的真实余额接口 URL 需由你填写；插件不会自动拼出 OpenAI 或 Anthropic 的余额接口。"
+                },
+                "method": {
+                  "description": "HTTP 方法",
+                  "hint": "选择 GET 或 POST。"
+                },
+                "api_key": {
+                  "description": "API Key",
+                  "hint": "按认证方式手动填写；密钥不会从 AstrBot 模型供应商复制。"
+                },
+                "auth_mode": {
+                  "description": "认证方式",
+                  "hint": "none 不发送 API Key；bearer 使用 Bearer 认证；header 将 API Key 放入指定请求头。"
+                },
+                "auth_header": {
+                  "description": "认证请求头名称",
+                  "hint": "auth_mode 选择 header 时使用。"
+                },
+                "headers": {
+                  "description": "额外请求头 JSON",
+                  "hint": "输入 JSON 对象；只支持静态键值，不支持表达式。"
+                },
+                "body": {
+                  "description": "POST 请求体 JSON",
+                  "hint": "输入 JSON 对象；只支持静态键值，不支持表达式。GET 请求不会发送请求体。"
+                },
+                "fields": {
+                  "description": "响应字段 JSON Pointer 映射",
+                  "hint": "至少填写“余额”路径；其余字段可选。例：响应 {\"data\":{\"balance\":12.5}} 对应 /data/balance。路径按 JSON Pointer 读取，不执行任意表达式。",
+                  "items": {
+                    "余额": {
+                      "description": "余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。 余额为必填。"
+                    },
+                    "币种": {
+                      "description": "币种 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "赠送余额": {
+                      "description": "赠送余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "充值余额": {
+                      "description": "充值余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "代金券余额": {
+                      "description": "代金券余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "现金余额": {
+                      "description": "现金余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    }
+                  }
+                }
+              }
+            },
+            "origin": {
+              "description": "记录来源"
+            },
+            "scan_status": {
+              "description": "扫描状态"
+            },
+            "scan_note": {
+              "description": "扫描说明"
+            }
+          }
+        },
+        "custom": {
+          "name": "自定义 HTTP",
+          "hint": "每条记录对应一个余额查询接口。secret 字段使用密码输入框，扫描不会复制模型供应商密钥。",
+          "items": {
+            "id": {
+              "description": "记录标识"
+            },
+            "alias": {
+              "description": "别名",
+              "hint": "必填且唯一；不得包含空白字符；保留字：所有、当前、用量。"
+            },
+            "kind": {
+              "description": "类型"
+            },
+            "provider_ids": {
+              "description": "绑定的 AstrBot 供应商 ID",
+              "hint": "可多选供应商；绑定仅按 ID 保存，不读取或显示供应商密钥。"
+            },
+            "credential_ref": {
+              "description": "单 Key 凭证引用",
+              "hint": "仅 DeepSeek、Kimi 和自定义类型可引用现有 AstrBot 单 Key Provider ID；手填 API Key 优先。只保存引用，不复制或显示模型供应商密钥。OpenRouter Management Key 与云账号 AK 必须单独填写。"
+            },
+            "settings": {
+              "description": "余额接口设置",
+              "items": {
+                "url": {
+                  "description": "余额查询 URL",
+                  "hint": "自定义兼容服务的真实余额接口 URL 需由你填写；插件不会自动拼出 OpenAI 或 Anthropic 的余额接口。"
+                },
+                "method": {
+                  "description": "HTTP 方法",
+                  "hint": "选择 GET 或 POST。"
+                },
+                "api_key": {
+                  "description": "API Key",
+                  "hint": "按认证方式手动填写；密钥不会从 AstrBot 模型供应商复制。"
+                },
+                "auth_mode": {
+                  "description": "认证方式",
+                  "hint": "none 不发送 API Key；bearer 使用 Bearer 认证；header 将 API Key 放入指定请求头。"
+                },
+                "auth_header": {
+                  "description": "认证请求头名称",
+                  "hint": "auth_mode 选择 header 时使用。"
+                },
+                "headers": {
+                  "description": "额外请求头 JSON",
+                  "hint": "输入 JSON 对象；只支持静态键值，不支持表达式。"
+                },
+                "body": {
+                  "description": "POST 请求体 JSON",
+                  "hint": "输入 JSON 对象；只支持静态键值，不支持表达式。GET 请求不会发送请求体。"
+                },
+                "fields": {
+                  "description": "响应字段 JSON Pointer 映射",
+                  "hint": "至少填写“余额”路径；其余字段可选。例：响应 {\"data\":{\"balance\":12.5}} 对应 /data/balance。路径按 JSON Pointer 读取，不执行任意表达式。",
+                  "items": {
+                    "余额": {
+                      "description": "余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。 余额为必填。"
+                    },
+                    "币种": {
+                      "description": "币种 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "赠送余额": {
+                      "description": "赠送余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "充值余额": {
+                      "description": "充值余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "代金券余额": {
+                      "description": "代金券余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    },
+                    "现金余额": {
+                      "description": "现金余额 的 JSON Pointer",
+                      "hint": "使用 JSON Pointer 路径，例如 /data/balance；不是模板或代码。"
+                    }
+                  }
+                }
+              }
+            },
+            "origin": {
+              "description": "记录来源"
+            },
+            "scan_status": {
+              "description": "扫描状态"
+            },
+            "scan_note": {
+              "description": "扫描说明"
+            }
+          }
+        }
+      }
+    }
+  }
+}
