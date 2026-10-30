@@ -34,6 +34,19 @@ class _DirectWorkflow:
     events: list[Any] = field(default_factory=list)
 
 
+@dataclass
+class _RespondDelivery:
+    event: Any
+    result_kind: str | None
+    source_component_ids: frozenset[int]
+    successful_sends: int = 0
+    failed: bool = False
+    stream_content: bool = False
+    stream_send_successes: int = 0
+    stream_active: bool = False
+    process_completed: bool = False
+
+
 class QuotaCompatibility:
     """Reserve quota before generation and settle it after delivery.
 
@@ -59,6 +72,12 @@ class QuotaCompatibility:
         self._active_proactive_events: contextvars.ContextVar[list[Any] | None] = (
             contextvars.ContextVar(f"better_balance_proactive_events_{id(self)}", default=None)
         )
+        self._active_respond_delivery: contextvars.ContextVar[
+            _RespondDelivery | None
+        ] = contextvars.ContextVar(
+            f"better_balance_respond_delivery_{id(self)}", default=None
+        )
+        self._streaming_response_event: Any = None
 
     @staticmethod
     def scope_from_event(event: Any) -> Scope | None:
@@ -127,23 +146,83 @@ class QuotaCompatibility:
         return None
 
     @staticmethod
-    def _is_model_result(result: Any) -> bool:
-        """Check the sent result object itself, excluding tool/plugin messages."""
+    def _model_result_kind(result: Any) -> str | None:
+        """Return the exact successful model-result kind, if known."""
         if result is None:
-            return False
-        for name in ("is_model_result", "is_llm_result"):
-            marker = getattr(result, name, None)
-            if callable(marker):
-                try:
-                    if marker():
-                        return True
-                except Exception:
-                    pass
+            return None
         content_type = getattr(result, "result_content_type", None)
-        if content_type is None:
+        if content_type is not None:
+            raw_name = getattr(content_type, "name", content_type)
+            name = str(raw_name).rsplit(".", 1)[-1].casefold()
+            if name == "llm_result":
+                return "llm"
+            if name == "streaming_result":
+                return "streaming"
+            return None
+
+        # A custom supported adapter may expose the explicit is_llm_result
+        # protocol without AstrBot's result_content_type enum.
+        marker = getattr(result, "is_llm_result", None)
+        try:
+            if callable(marker) and marker():
+                return "llm"
+            if marker is True:
+                return "llm"
+        except Exception:
+            pass
+        return None
+
+    @classmethod
+    def _is_model_result(cls, result: Any) -> bool:
+        """Check for LLM output; runner errors are not successful output."""
+        return cls._model_result_kind(result) is not None
+
+    def _active_delivery_for(self, event: Any) -> _RespondDelivery | None:
+        delivery = self._active_respond_delivery.get()
+        if delivery is not None and delivery.event is event:
+            return delivery
+        return None
+
+    @staticmethod
+    def _message_matches_delivery(delivery: _RespondDelivery, message: Any) -> bool:
+        chain = getattr(message, "chain", None)
+        if not isinstance(chain, (list, tuple)) or not chain:
             return False
-        name = str(getattr(content_type, "name", content_type)).casefold()
-        return any(tag in name for tag in ("model", "llm", "stream"))
+        if not delivery.source_component_ids:
+            return False
+        return all(id(component) in delivery.source_component_ids for component in chain)
+
+    def _in_streaming_send_context(self, event: Any) -> bool:
+        marker = self._streaming_response_event
+        getter = getattr(marker, "get", None)
+        if not callable(getter):
+            return False
+        try:
+            return getter() is event
+        except Exception:
+            return False
+
+    @staticmethod
+    def _chunk_type(chunk: Any) -> str:
+        value = getattr(chunk, "type", "")
+        raw_name = getattr(value, "name", value)
+        return str(raw_name).rsplit(".", 1)[-1].casefold()
+
+    @classmethod
+    def _is_user_stream_chunk(cls, chunk: Any) -> bool:
+        chain = getattr(chunk, "chain", None)
+        return bool(chain) and cls._chunk_type(chunk) not in {
+            "break",
+            "reasoning",
+            "tool_call",
+            "agent_stats",
+        }
+
+    def _release_event_if_not_delivering(self, event: Any) -> bool:
+        if self._active_delivery_for(event) is not None:
+            return False
+        return self.release_event(event)
+
 
     def _event_state(self, event: Any) -> _EventState | None:
         state = self._events.get(id(event))
@@ -262,12 +341,39 @@ class QuotaCompatibility:
 
             @wraps(send)
             async def tracked_send(message: Any, *args: Any, **kwargs: Any) -> Any:
-                result = await send(message, *args, **kwargs)
-                if (
-                    self._active
-                    and result is not False
-                    and self._is_model_result(message)
-                ):
+                delivery = self._active_delivery_for(event)
+                matched_llm = bool(
+                    delivery
+                    and delivery.result_kind == "llm"
+                    and self._message_matches_delivery(delivery, message)
+                )
+                matched_stream = bool(
+                    delivery
+                    and delivery.result_kind == "streaming"
+                    and delivery.stream_active
+                    and self._in_streaming_send_context(event)
+                )
+                try:
+                    result = await send(message, *args, **kwargs)
+                except BaseException:
+                    if matched_llm or matched_stream:
+                        delivery.failed = True
+                    raise
+
+                if delivery is not None:
+                    if matched_llm or matched_stream:
+                        if result is False:
+                            delivery.failed = True
+                        elif matched_llm:
+                            delivery.successful_sends += 1
+                        else:
+                            delivery.stream_send_successes += 1
+                    # Respond-stage sends are only eligible when they are the
+                    # concrete derived output (or an adapter's visible stream
+                    # chunk). Never fall back to an event-wide LLM marker here.
+                    return result
+
+                if self._active and result is not False and self._is_model_result(message):
                     self.commit_event(event)
                 return result
 
@@ -285,22 +391,55 @@ class QuotaCompatibility:
 
             @wraps(send_streaming)
             async def tracked_streaming(generator: Any, *args: Any, **kwargs: Any) -> Any:
+                delivery = self._active_delivery_for(event)
+                if delivery is not None:
+                    if (
+                        delivery.result_kind != "streaming"
+                        or not self._in_streaming_send_context(event)
+                    ):
+                        # In particular, generation-time tool streams run with
+                        # streaming_response_event cleared by RespondStage.
+                        return await send_streaming(generator, *args, **kwargs)
+
                 delivered = False
 
                 async def watched_stream():
                     nonlocal delivered
                     async for chunk in generator:
-                        chunk_type = str(getattr(chunk, "type", "")).casefold()
-                        chunk_chain = getattr(chunk, "chain", None)
                         if (
-                            chunk_chain
-                            and chunk_type
-                            not in {"break", "reasoning", "tool_call", "agent_stats"}
+                            self._is_user_stream_chunk(chunk)
+                            and (
+                                delivery is None
+                                or self._in_streaming_send_context(event)
+                            )
                         ):
                             delivered = True
                         yield chunk
 
-                result = await send_streaming(watched_stream(), *args, **kwargs)
+                if delivery is not None:
+                    delivery.stream_active = True
+                try:
+                    result = await send_streaming(watched_stream(), *args, **kwargs)
+                except BaseException:
+                    if delivery is not None:
+                        delivery.failed = True
+                    raise
+                finally:
+                    if delivery is not None:
+                        delivery.stream_active = False
+
+                if delivery is not None:
+                    if result is False:
+                        delivery.failed = True
+                    elif delivered:
+                        delivery.stream_content = True
+                        if result is True:
+                            # Some adapters provide an explicit success value;
+                            # AstrBot's aiocqhttp path instead sends through
+                            # event.send, which is recorded above.
+                            delivery.stream_send_successes += 1
+                    return result
+
                 if (
                     self._active
                     and result is not False
@@ -346,6 +485,8 @@ class QuotaCompatibility:
 
     def settle_event_workflow(self, event: Any) -> None:
         """Release unfinished reservations and restore per-event send wrappers."""
+        if self._active_delivery_for(event) is not None:
+            return
         self.release_event(event)
         self._restore_event_sends(event)
         state = self._event_state(event)
@@ -558,10 +699,13 @@ class QuotaCompatibility:
                         async for item in original(instance, event, *args, **kwargs):
                             yield item
                     except BaseException:
-                        self.release_event(event)
+                        self._release_event_if_not_delivering(event)
                         raise
                     finally:
-                        if not self._current_result_is_model(event):
+                        if (
+                            self._active_delivery_for(event) is None
+                            and not self._current_result_is_model(event)
+                        ):
                             self.release_event(event)
 
                 return wrapped
@@ -581,10 +725,13 @@ class QuotaCompatibility:
                         async for item in original(instance, event, *args, **kwargs):
                             yield item
                     except BaseException:
-                        self.release_event(event)
+                        self._release_event_if_not_delivering(event)
                         raise
                     finally:
-                        if not self._current_result_is_model(event):
+                        if (
+                            self._active_delivery_for(event) is None
+                            and not self._current_result_is_model(event)
+                        ):
                             self.settle_event_workflow(event)
 
                 return wrapped
@@ -593,14 +740,56 @@ class QuotaCompatibility:
         self._patch_descriptor(owner, "process", build)
 
     def _patch_respond_stage(self, owner: type) -> None:
+        module = inspect.getmodule(owner)
+        streaming_marker = getattr(module, "streaming_response_event", None)
+        if callable(getattr(streaming_marker, "get", None)):
+            self._streaming_response_event = streaming_marker
+
         def build(original: Any) -> Any:
             if inspect.iscoroutinefunction(original):
 
                 @wraps(original)
                 async def wrapped(instance: Any, event: Any, *args: Any, **kwargs: Any):
+                    getter = getattr(event, "get_result", None)
                     try:
-                        return await original(instance, event, *args, **kwargs)
+                        result = getter() if callable(getter) else None
+                    except Exception:
+                        result = None
+                    result_kind = self._model_result_kind(result)
+                    source_chain = getattr(result, "chain", None)
+                    source_component_ids = frozenset(
+                        id(component) for component in source_chain or ()
+                    )
+                    delivery = _RespondDelivery(
+                        event=event,
+                        result_kind=result_kind,
+                        source_component_ids=source_component_ids,
+                    )
+                    token = self._active_respond_delivery.set(delivery)
+                    try:
+                        response = await original(instance, event, *args, **kwargs)
+                        delivery.process_completed = True
+                        return response
+                    except BaseException:
+                        raise
                     finally:
+                        self._active_respond_delivery.reset(token)
+                        if (
+                            delivery.process_completed
+                            and not delivery.failed
+                            and (
+                                (
+                                    result_kind == "llm"
+                                    and delivery.successful_sends > 0
+                                )
+                                or (
+                                    result_kind == "streaming"
+                                    and delivery.stream_content
+                                    and delivery.stream_send_successes > 0
+                                )
+                            )
+                        ):
+                            self.commit_event(event)
                         self.settle_event_workflow(event)
 
                 return wrapped

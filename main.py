@@ -41,7 +41,7 @@ def _render_template(template: object, values: dict) -> str:
     "astrbot_plugin_better_balance",
     "Xing",
     "每日聊天配额与模型供应商余额管理插件",
-    "0.4.0",
+    "0.4.1",
 )
 class BetterBalancePlugin(Star):
     """Manage chat quotas and query provider balances without an LLM call."""
