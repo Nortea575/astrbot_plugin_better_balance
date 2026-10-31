@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import importlib
-import logging
 from typing import Any
 
-
-_LOGGER = logging.getLogger(__name__)
+from astrbot.api import logger
 
 
 class UsageService:
@@ -49,7 +47,7 @@ class UsageService:
                 raise ValueError("AstrBot returned an invalid Token total")
             return total
         except Exception:
-            _LOGGER.warning(
+            logger.warning(
                 "Unable to read AstrBot global ProviderStat totals for days=%s.",
                 days,
             )

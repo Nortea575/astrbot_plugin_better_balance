@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import inspect
-import logging
 import sys
 from collections.abc import Mapping
 
-from astrbot.api import AstrBotConfig
+from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, StarTools, register
 
@@ -17,9 +16,6 @@ from .configuration import TEXT_DEFAULTS
 from .quota import Store
 from .usage import UsageService
 from .web import WebAPI
-
-
-_LOGGER = logging.getLogger(__name__)
 
 
 def _render_template(template: object, values: dict) -> str:
@@ -41,7 +37,7 @@ def _render_template(template: object, values: dict) -> str:
     "astrbot_plugin_better_balance",
     "Xing",
     "每日聊天配额与模型供应商余额管理插件",
-    "0.4.1",
+    "0.4.2",
 )
 class BetterBalancePlugin(Star):
     """Manage chat quotas and query provider balances without an LLM call."""
@@ -87,7 +83,7 @@ class BetterBalancePlugin(Star):
             current["balance_providers"] = scanned["records"]
             self.store.save_config(current)
         except Exception:
-            _LOGGER.warning("Local balance metadata scan failed.")
+            logger.warning("Local balance metadata scan failed.")
 
     @staticmethod
     def _text_settings(config: dict) -> dict:
@@ -131,7 +127,9 @@ class BetterBalancePlugin(Star):
         self, results: list, text_settings: dict, *, all_mode: bool
     ) -> str:
         if not results:
-            return str(text_settings.get("balance_empty", TEXT_DEFAULTS["balance_empty"]))
+            return str(
+                text_settings.get("balance_empty", TEXT_DEFAULTS["balance_empty"])
+            )
         lines = []
         for result in results:
             if not isinstance(result, dict):
@@ -151,7 +149,8 @@ class BetterBalancePlugin(Star):
             except Exception:
                 template_key = "balance_custom"
             template = text_settings.get(
-                template_key, TEXT_DEFAULTS.get(template_key, TEXT_DEFAULTS["balance_custom"])
+                template_key,
+                TEXT_DEFAULTS.get(template_key, TEXT_DEFAULTS["balance_custom"]),
             )
             rows = result.get("rows")
             if not isinstance(rows, list) or not rows:
@@ -233,17 +232,19 @@ class BetterBalancePlugin(Star):
                 template = text_settings.get(
                     "balance_usage_hint", TEXT_DEFAULTS["balance_usage_hint"]
                 )
-                summary = _render_template(
-                    template, {"前缀": self._wake_prefix(event)}
-                )
+                summary = _render_template(template, {"前缀": self._wake_prefix(event)})
             else:
                 token_total = await self.usage_service.get_total_tokens(selected[0])
                 if token_total is None:
                     summary = str(
-                        text_settings.get("usage_failure", TEXT_DEFAULTS["usage_failure"])
+                        text_settings.get(
+                            "usage_failure", TEXT_DEFAULTS["usage_failure"]
+                        )
                     )
                 else:
-                    template = text_settings.get("usage_reply", TEXT_DEFAULTS["usage_reply"])
+                    template = text_settings.get(
+                        "usage_reply", TEXT_DEFAULTS["usage_reply"]
+                    )
                     summary = _render_template(
                         template,
                         {"时间": selected[1], "token": f"{token_total:,}"},
@@ -293,7 +294,11 @@ class BetterBalancePlugin(Star):
             )
             if record is None:
                 yield event.plain_result(
-                    str(text_settings.get("balance_unbound", TEXT_DEFAULTS["balance_unbound"]))
+                    str(
+                        text_settings.get(
+                            "balance_unbound", TEXT_DEFAULTS["balance_unbound"]
+                        )
+                    )
                 )
                 return
         else:
@@ -313,9 +318,7 @@ class BetterBalancePlugin(Star):
                 return
 
         result = await self.balance_service.query_record(record)
-        summary = self._render_balance_results(
-            [result], text_settings, all_mode=False
-        )
+        summary = self._render_balance_results([result], text_settings, all_mode=False)
         yield event.plain_result(summary)
 
     @filter.command("帮助", priority=sys.maxsize)

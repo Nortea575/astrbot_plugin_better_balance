@@ -1,6 +1,6 @@
 # 更好的额度管理
 
-管理 AstrBot 的每日私聊和群聊配额、供应商余额查询，以及 AstrBot 内部记录的全局 Token 用量。版本：`0.4.1`
+管理 AstrBot 的每日私聊和群聊配额、供应商余额查询，以及 AstrBot 内部记录的全局 Token 用量。版本：`0.4.2`
 
 源码仓库：[Nortea575/astrbot_plugin_better_balance](https://github.com/Nortea575/astrbot_plugin_better_balance)
 
