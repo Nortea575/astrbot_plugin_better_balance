@@ -120,7 +120,8 @@
       "balance_usage_hint": "用法：{前缀}余额 所有／当前／别名／用量 1天|3天|1周",
       "usage_reply": "最近{时间}全局 Token 用量：{token}。",
       "usage_failure": "暂时无法读取全局 Token 用量。",
-      "help_reply": "{命令列表}"
+      "help_reply": "{命令列表}",
+      "balance_newapi": "{别名}（{查询范围}）：{余额} {币种}"
     },
     "items": {
       "quota_reply": {
@@ -248,6 +249,12 @@
         "type": "text",
         "default": "{命令列表}",
         "hint": "支持 {命令列表}；不要使用其他格式表达式。"
+      },
+      "balance_newapi": {
+        "description": "NewAPI 网关余额回复",
+        "type": "text",
+        "default": "{别名}（{查询范围}）：{余额} {币种}",
+        "hint": "支持 {别名}、{余额}、{币种}、{查询范围}；不要使用其他格式表达式。"
       }
     },
     "hint": "图形化管理页与此对象共用配置。占位符仅支持字段提示中列出的名称，不支持任意格式表达式。"
@@ -292,7 +299,7 @@
     "description": "余额查询供应商记录",
     "type": "template_list",
     "default": [],
-    "hint": "自定义兼容服务必须填写真实余额 URL。扫描只识别本地 AstrBot 供应商配置，不发起余额请求。",
+    "hint": "NewAPI 可填写网关地址和 API Key；自定义兼容服务必须填写真实余额 URL。扫描只识别本地 AstrBot 供应商信息，不发起余额请求。",
     "templates": {
       "deepseek": {
         "name": "DeepSeek",
@@ -715,6 +722,148 @@
                 "type": "string",
                 "default": "CNY",
                 "hint": "可按接口返回情况调整。"
+              }
+            }
+          },
+          "origin": {
+            "description": "记录来源",
+            "type": "string",
+            "default": "manual",
+            "invisible": true
+          },
+          "scan_status": {
+            "description": "扫描状态",
+            "type": "string",
+            "default": "needs_configuration",
+            "invisible": true
+          },
+          "scan_note": {
+            "description": "扫描说明",
+            "type": "string",
+            "default": "",
+            "invisible": true
+          }
+        }
+      },
+      "newapi": {
+        "name": "NewAPI 网关",
+        "hint": "查询 NewAPI 网关账户或令牌余额；API Key 使用密码输入框。",
+        "display_item": "alias",
+        "hide_hint_in_list": true,
+        "items": {
+          "id": {
+            "description": "记录标识",
+            "type": "string",
+            "default": "",
+            "invisible": true
+          },
+          "alias": {
+            "description": "别名",
+            "type": "string",
+            "default": "",
+            "hint": "必填且唯一；不得包含空白字符；保留字：所有、当前、用量。"
+          },
+          "kind": {
+            "description": "类型",
+            "type": "string",
+            "default": "newapi",
+            "invisible": true
+          },
+          "provider_ids": {
+            "description": "绑定的 AstrBot 供应商 ID",
+            "type": "list",
+            "default": [],
+            "hint": "可多选供应商；绑定仅按 ID 保存，不读取或显示供应商密钥。"
+          },
+          "credential_ref": {
+            "description": "单 Key 凭证引用",
+            "type": "string",
+            "default": "",
+            "hint": "可引用现有 AstrBot 单 Key Provider ID；只保存 ID，不复制密钥。手动填写的 NewAPI API Key 优先。"
+          },
+          "settings": {
+            "description": "NewAPI 网关设置",
+            "type": "object",
+            "default": {
+              "base_url": "",
+              "api_key": "",
+              "quota_scope": "account",
+              "display_unit": "auto",
+              "quota_per_unit": "",
+              "usd_exchange_rate": "",
+              "custom_currency_symbol": "",
+              "custom_currency_exchange_rate": ""
+            },
+            "items": {
+              "base_url": {
+                "description": "NewAPI 网关地址",
+                "type": "string",
+                "default": "",
+                "hint": "填写 NewAPI 站点根地址，例如 https://newapi.example.com。",
+                "obvious_hint": true
+              },
+              "api_key": {
+                "description": "NewAPI API Key",
+                "type": "string",
+                "default": "",
+                "hint": "填写余额查询用的 NewAPI API Key；也可引用单 Key AstrBot 供应商。",
+                "secret": true
+              },
+              "quota_scope": {
+                "description": "查询范围",
+                "type": "string",
+                "default": "account",
+                "hint": "账户额度或当前 API Key 对应的令牌额度。",
+                "options": [
+                  "account",
+                  "token"
+                ],
+                "labels": [
+                  "账户余额",
+                  "令牌余额"
+                ]
+              },
+              "display_unit": {
+                "description": "显示单位",
+                "type": "string",
+                "default": "auto",
+                "hint": "自动模式读取站点配置；也可固定显示 CNY、USD 或原始 QUOTA。",
+                "options": [
+                  "auto",
+                  "CNY",
+                  "USD",
+                  "QUOTA"
+                ],
+                "labels": [
+                  "自动读取站点",
+                  "人民币",
+                  "美元",
+                  "原始额度"
+                ]
+              },
+              "quota_per_unit": {
+                "description": "每单位额度",
+                "type": "string",
+                "default": "",
+                "hint": "留空读取站点配置；手动填写时覆盖站点的每单位额度。"
+              },
+              "usd_exchange_rate": {
+                "description": "美元汇率",
+                "type": "string",
+                "default": "",
+                "hint": "留空读取站点配置；手动填写时覆盖站点的美元汇率。"
+              },
+              "custom_currency_symbol": {
+                "description": "自定义币种符号",
+                "type": "string",
+                "default": "",
+                "hint": "留空读取站点配置；手动填写时覆盖站点的自定义币种符号。"
+              },
+              "custom_currency_exchange_rate": {
+                "description": "自定义币种汇率",
+                "type": "string",
+                "default": "",
+                "hint": "留空读取站点配置；手动填写时覆盖站点的自定义币种汇率。"
               }
             }
           },

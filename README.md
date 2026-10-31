@@ -1,6 +1,6 @@
 # 更好的额度管理
 
-管理 AstrBot 的每日私聊和群聊配额、供应商余额查询，以及 AstrBot 内部记录的全局 Token 用量。版本：`0.4.2`
+管理 AstrBot 的每日私聊和群聊配额、供应商余额查询，以及 AstrBot 内部记录的全局 Token 用量。版本：`0.5.0`
 
 源码仓库：[Nortea575/astrbot_plugin_better_balance](https://github.com/Nortea575/astrbot_plugin_better_balance)
 
@@ -33,7 +33,11 @@ Dashboard 管理页的配置 API 仅供已登录的 AstrBot 管理员使用。QQ
 
 每条记录有唯一别名，可绑定一个或多个 AstrBot 供应商 ID。别名不能包含空白字符，也不能使用 `所有`、`当前`、`用量`。管理页支持新增、编辑、删除、扫描本地供应商配置、按别名查询和查询全部记录；扫描不会发起余额请求。扫描结果会区分新增、更新和需要配置的记录。未知供应商会作为未识别的自定义记录等待配置；扫描不会推断它支持哪家余额 API，也不会覆盖手动修改过的别名和查询字段。
 
-内置记录类型为 DeepSeek、Kimi（月之暗面）、OpenRouter、阿里云 BSS 和火山引擎。余额查询需要相应服务的查询凭证：阿里云和火山引擎使用云账号 Access Key ID/Secret，并需要相应 BSS/账单查询权限；这是云账号凭证，不是 AstrBot 模型 API Key。OpenRouter 需要 Management Key，普通模型 API Key 不能替代它。DeepSeek、Kimi 和自定义类型可用 `credential_ref` 引用现有 AstrBot 单 Key 供应商；引用只保存供应商 ID，不复制密钥，手动填写的 API Key 优先。
+内置记录类型为 DeepSeek、Kimi（月之暗面）、OpenRouter、阿里云 BSS、火山引擎和 NewAPI 网关。余额查询需要相应服务的查询凭证：阿里云和火山引擎使用云账号 Access Key ID/Secret，并需要相应 BSS/账单查询权限；这是云账号凭证，不是 AstrBot 模型 API Key。OpenRouter 需要 Management Key，普通模型 API Key 不能替代它。DeepSeek、Kimi、NewAPI 和自定义类型可用 `credential_ref` 引用现有 AstrBot 单 Key 供应商；引用只保存供应商 ID，不复制密钥，手动填写的 API Key 优先。
+
+NewAPI 网关记录填写网关 `base_url` 和 API Key，并选择查询账户或令牌额度。显示单位可跟随站点配置（`auto`），或固定为人民币（`CNY`）、美元（`USD`）和原始额度（`QUOTA`）。高级参数留空时读取站点配置；手动填写后覆盖站点对应设置。绑定单个 AstrBot 供应商时，管理页可用其公开 API 地址填入空白网关地址，并引用其单 Key；已有手填地址和 Key 会保留。
+
+NewAPI 查询有三项边界：账户权限不足会明确失败，不会改查令牌额度；令牌不限额会显示为“不限额”；扫描只读取本地 Provider 信息，必须在管理页手动选择 NewAPI，不会探测网络或把 OpenAI 兼容接口自动认作 NewAPI。现有余额命令直接查询该记录，无需新增命令，也不调用 LLM。
 
 `自定义（OpenAI 来源）`、`自定义（Anthropic 来源）` 和 `自定义 HTTP` 都要求填写实际可用的余额 URL、认证信息和 JSON Pointer 响应字段映射。它们不会调用 OpenAI 或 Anthropic 的官方余额接口，也不会凭模型 API 地址自动推导余额接口。自定义 HTTP 支持 GET/POST、静态请求头和 JSON 请求体；路径示例：响应 `{"data":{"balance":12.5}}` 的余额字段可映射为 `/data/balance`。路径按 JSON Pointer 读取，不执行任意表达式。
 
@@ -49,6 +53,8 @@ Dashboard 管理页的配置 API 仅供已登录的 AstrBot 管理员使用。QQ
 Token 用量来自 AstrBot 内部 `ProviderStat` 记录，统计普通输入、缓存输入和输出 Token。直接调用 Provider、没有写入该统计表的请求不会计入。
 
 ## 回复文本
+
+0.5.0 新增 NewAPI 网关的账户/令牌额度查询及独立回复模板。回复占位符包括 `{别名}`、`{余额}`、`{币种}` 和 `{查询范围}`；字段提示列出每条文本支持的占位符，不支持任意格式表达式。已有自定义文案会保留。
 
 0.4.1 保留默认回复文本；升级时会保留已保存的自定义配额回复。余额回复按供应商类型使用对应模板，自定义兼容服务共用一个模板。字段提示列出每条文本支持的占位符；不支持任意格式表达式。
 

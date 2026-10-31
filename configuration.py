@@ -20,6 +20,7 @@ TEXT_DEFAULTS = {
     "balance_openrouter": "{别名}：{余额} {币种}",
     "balance_aliyun": "{别名}：{余额} {币种}",
     "balance_volcengine": "{别名}：{余额} {币种}",
+    "balance_newapi": "{别名}（{查询范围}）：{余额} {币种}",
     "balance_custom": "{别名}：{余额} {币种}",
     "balance_all_failure": "{别名}：查询失败（{错误}）",
     "balance_failure": "{别名}：查询失败（{错误}）",
@@ -52,6 +53,7 @@ BALANCE_KINDS = {
     "openrouter",
     "aliyun",
     "volcengine",
+    "newapi",
     "custom_openai",
     "custom_anthropic",
     "custom",
@@ -71,6 +73,7 @@ _TEMPLATE_FIELDS = {
     "balance_openrouter": {"别名", "余额", "币种"},
     "balance_aliyun": {"别名", "余额", "币种"},
     "balance_volcengine": {"别名", "余额", "币种"},
+    "balance_newapi": {"别名", "余额", "币种", "查询范围"},
     "balance_custom": {"别名", "余额", "币种"},
     "balance_all_failure": {"别名", "错误"},
     "balance_failure": {"别名", "错误"},
@@ -196,7 +199,11 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
             raw["text_settings"][key] = copy.deepcopy(payload[key])
 
     schema_version = raw.get("schema_version", 2)
-    if isinstance(schema_version, bool) or not isinstance(schema_version, int) or schema_version not in (1, 2):
+    if (
+        isinstance(schema_version, bool)
+        or not isinstance(schema_version, int)
+        or schema_version not in (1, 2)
+    ):
         raise ValueError("schema_version 必须为 1 或 2")
     if raw.get("time_zone") != "Asia/Shanghai":
         raise ValueError("time_zone 仅支持 Asia/Shanghai")
@@ -231,7 +238,8 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
         raw_group_id = item.get("id")
         group_id = (
             f"group-{uuid.uuid4().hex}"
-            if raw_group_id is None or (isinstance(raw_group_id, str) and not raw_group_id.strip())
+            if raw_group_id is None
+            or (isinstance(raw_group_id, str) and not raw_group_id.strip())
             else raw_group_id.strip()
             if isinstance(raw_group_id, str)
             else None
@@ -247,7 +255,11 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
         group_ids.add(group_id.casefold())
         group_names.add(name.casefold())
         daily_limit = item.get("daily_limit")
-        if isinstance(daily_limit, bool) or not isinstance(daily_limit, int) or daily_limit < -1:
+        if (
+            isinstance(daily_limit, bool)
+            or not isinstance(daily_limit, int)
+            or daily_limit < -1
+        ):
             raise ValueError(f"{label}.daily_limit 必须是 -1、0 或正整数")
         user_ids_raw = item.get("user_ids")
         if not isinstance(user_ids_raw, list):
@@ -256,13 +268,20 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
         for member_index, member in enumerate(user_ids_raw):
             member_id = member.strip() if isinstance(member, str) else ""
             if not _QQ_RE.fullmatch(member_id):
-                raise ValueError(f"{label}.user_ids[{member_index}] 必须是 QQ 数字字符串")
+                raise ValueError(
+                    f"{label}.user_ids[{member_index}] 必须是 QQ 数字字符串"
+                )
             if member_id in member_to_group:
                 raise ValueError("一个用户只能属于一个 user_group")
             member_to_group[member_id] = group_id
             user_ids.append(member_id)
         user_groups.append(
-            {"id": group_id, "name": name, "daily_limit": daily_limit, "user_ids": user_ids}
+            {
+                "id": group_id,
+                "name": name,
+                "daily_limit": daily_limit,
+                "user_ids": user_ids,
+            }
         )
 
     group_rules_raw = raw.get("group_rules")
@@ -281,7 +300,11 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
             raise ValueError(f"{label}.group_id 必须是 QQ 数字字符串")
         if group_id in rule_ids:
             raise ValueError("group_rules 的 group_id 必须唯一")
-        if isinstance(daily_limit, bool) or not isinstance(daily_limit, int) or daily_limit < -1:
+        if (
+            isinstance(daily_limit, bool)
+            or not isinstance(daily_limit, int)
+            or daily_limit < -1
+        ):
             raise ValueError(f"{label}.daily_limit 必须是 -1、0 或正整数")
         rule_ids.add(group_id)
         group_rules.append({"group_id": group_id, "daily_limit": daily_limit})
@@ -301,6 +324,8 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
         **limits,
         "user_groups": user_groups,
         "group_rules": group_rules,
-        "balance_providers": _normalize_balance_providers(raw.get("balance_providers", [])),
+        "balance_providers": _normalize_balance_providers(
+            raw.get("balance_providers", [])
+        ),
         "text_settings": text_settings,
     }

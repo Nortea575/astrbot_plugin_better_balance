@@ -14,6 +14,7 @@ import hmac
 import json
 import re
 import time
+import unicodedata
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timezone
@@ -26,6 +27,7 @@ _KINDS = (
     "deepseek",
     "kimi",
     "openrouter",
+    "newapi",
     "aliyun",
     "volcengine",
     "custom_openai",
@@ -37,7 +39,17 @@ _SUPPORTED_FIELDS = ("余额", "币种", "赠送余额", "充值余额", "代金
 _SENSITIVE_INPUTS = {"api_key", "access_key_secret"}
 
 
-def _input(name, label, *, required=False, secret=False, hint="", kind="string", options=None):
+def _input(
+    name,
+    label,
+    *,
+    required=False,
+    secret=False,
+    hint="",
+    kind="string",
+    options=None,
+    labels=None,
+):
     field_type = "secret" if secret else kind
     result = {
         "key": name,
@@ -48,10 +60,80 @@ def _input(name, label, *, required=False, secret=False, hint="", kind="string",
     }
     if options is not None:
         result["options"] = list(options)
+    if labels is not None:
+        result["labels"] = list(labels)
     return result
 
 
 _CATALOG = [
+    {
+        "kind": "newapi",
+        "label": "NewAPI",
+        "settings": {
+            "base_url": "",
+            "api_key": "",
+            "quota_scope": "account",
+            "display_unit": "auto",
+            "quota_per_unit": "",
+            "usd_exchange_rate": "",
+            "custom_currency_symbol": "",
+            "custom_currency_exchange_rate": "",
+        },
+        "input_fields": [
+            _input(
+                "base_url",
+                "NewAPI 站点地址",
+                required=True,
+                hint="可填站点根地址、反向代理子路径或末尾带 /v1 的模型 API 地址。",
+            ),
+            _input(
+                "api_key",
+                "NewAPI API Key",
+                required=True,
+                secret=True,
+                hint="留空时尝试使用绑定 Provider 的凭证。",
+            ),
+            _input(
+                "quota_scope",
+                "查询范围",
+                required=True,
+                kind="select",
+                options=["account", "token"],
+                labels=["账户余额", "令牌余额"],
+                hint="账户查询用户总额度；令牌查询当前 Key 的额度。",
+            ),
+            _input(
+                "display_unit",
+                "显示单位",
+                required=True,
+                kind="select",
+                options=["auto", "CNY", "USD", "QUOTA"],
+                labels=["自动读取站点", "人民币", "美元", "原始额度"],
+                hint="自动模式读取站点显示设置；QUOTA 保留原始配额。",
+            ),
+            _input(
+                "quota_per_unit",
+                "每单位配额",
+                hint="留空时读取站点设置；用于 USD、CNY 或自定义单位换算。",
+            ),
+            _input(
+                "usd_exchange_rate",
+                "美元兑人民币汇率",
+                hint="留空时读取站点设置；CNY 换算需要此值。",
+            ),
+            _input(
+                "custom_currency_symbol",
+                "自定义币种符号",
+                hint="留空时读取站点设置；例如“积分”。",
+            ),
+            _input(
+                "custom_currency_exchange_rate",
+                "自定义币种汇率",
+                hint="留空时读取站点设置；自定义单位换算需要此值。",
+            ),
+        ],
+        "template_variables": ["别名", "余额", "币种", "查询范围"],
+    },
     {
         "kind": "deepseek",
         "label": "DeepSeek",
@@ -62,8 +144,13 @@ _CATALOG = [
         },
         "input_fields": [
             _input("url", "余额查询地址", required=True),
-            _input("api_key", "DeepSeek API Key", required=True, secret=True,
-                   hint="自动扫描时通过 Provider ID 解析，不复制密钥。"),
+            _input(
+                "api_key",
+                "DeepSeek API Key",
+                required=True,
+                secret=True,
+                hint="自动扫描时通过 Provider ID 解析，不复制密钥。",
+            ),
             _input("currency", "默认币种", hint="留空时使用返回的余额币种。"),
         ],
         "template_variables": ["别名", "余额", "币种", "赠送余额", "充值余额"],
@@ -78,8 +165,13 @@ _CATALOG = [
         },
         "input_fields": [
             _input("url", "余额查询地址", required=True),
-            _input("api_key", "Kimi API Key", required=True, secret=True,
-                   hint="自动扫描时通过 Provider ID 解析，不复制密钥。"),
+            _input(
+                "api_key",
+                "Kimi API Key",
+                required=True,
+                secret=True,
+                hint="自动扫描时通过 Provider ID 解析，不复制密钥。",
+            ),
             _input("currency", "币种"),
         ],
         "template_variables": ["别名", "余额", "币种", "代金券余额", "现金余额"],
@@ -94,8 +186,13 @@ _CATALOG = [
         },
         "input_fields": [
             _input("url", "额度查询地址", required=True),
-            _input("api_key", "Management Key", required=True, secret=True,
-                   hint="Credits 接口要求 Management Key；自动扫描的模型 API Key 不可代替。"),
+            _input(
+                "api_key",
+                "Management Key",
+                required=True,
+                secret=True,
+                hint="Credits 接口要求 Management Key；自动扫描的模型 API Key 不可代替。",
+            ),
             _input("currency", "币种"),
         ],
         "template_variables": ["别名", "余额", "币种"],
@@ -112,7 +209,11 @@ _CATALOG = [
         "input_fields": [
             _input("access_key_id", "AccessKey ID", required=True),
             _input("access_key_secret", "AccessKey Secret", required=True, secret=True),
-            _input("region", "区域", hint="BSS OpenAPI 使用 business.aliyuncs.com RPC endpoint。"),
+            _input(
+                "region",
+                "区域",
+                hint="BSS OpenAPI 使用 business.aliyuncs.com RPC endpoint。",
+            ),
             _input("currency", "默认币种"),
         ],
         "template_variables": ["别名", "余额", "币种"],
@@ -128,7 +229,9 @@ _CATALOG = [
         },
         "input_fields": [
             _input("access_key_id", "AccessKey ID", required=True),
-            _input("access_key_secret", "Secret Access Key", required=True, secret=True),
+            _input(
+                "access_key_secret", "Secret Access Key", required=True, secret=True
+            ),
             _input("region", "区域", required=True, hint="用于火山引擎 V4 签名。"),
             _input("currency", "默认币种"),
         ],
@@ -157,17 +260,42 @@ for _kind, _label in (
             "label": _label,
             "settings": copy.deepcopy(_CUSTOM_DEFAULTS),
             "input_fields": [
-                _input("url", "余额查询地址", required=True,
-                       hint="这是单独配置的余额 HTTP 接口，不会从模型协议推断。"),
-                _input("method", "请求方法", required=True, kind="select", options=["GET", "POST"]),
+                _input(
+                    "url",
+                    "余额查询地址",
+                    required=True,
+                    hint="这是单独配置的余额 HTTP 接口，不会从模型协议推断。",
+                ),
+                _input(
+                    "method",
+                    "请求方法",
+                    required=True,
+                    kind="select",
+                    options=["GET", "POST"],
+                ),
                 _input("api_key", "API Key", secret=True),
-                _input("auth_mode", "认证方式", required=True, kind="select",
-                       options=["none", "bearer", "header"]),
+                _input(
+                    "auth_mode",
+                    "认证方式",
+                    required=True,
+                    kind="select",
+                    options=["none", "bearer", "header"],
+                ),
                 _input("auth_header", "认证请求头", hint="auth_mode=header 时使用。"),
                 _input("headers", "额外请求头", kind="json", hint="JSON 对象。"),
-                _input("body", "POST JSON 正文", kind="json", hint="JSON 对象；GET 请求不会发送正文。"),
-                _input("fields", "响应字段映射", required=True, kind="json",
-                       hint="JSON Pointer 映射，例如 {\"余额\":\"/data/balance\",\"币种\":\"/data/currency\"}。"),
+                _input(
+                    "body",
+                    "POST JSON 正文",
+                    kind="json",
+                    hint="JSON 对象；GET 请求不会发送正文。",
+                ),
+                _input(
+                    "fields",
+                    "响应字段映射",
+                    required=True,
+                    kind="json",
+                    hint='JSON Pointer 映射，例如 {"余额":"/data/balance","币种":"/data/currency"}。',
+                ),
             ],
             "template_variables": ["别名", "余额", "币种"],
         }
@@ -204,12 +332,18 @@ def _record_alias(value: object, index: int) -> str:
 
 
 def _parse_decimal(value: object, label: str = "余额") -> str:
-    if isinstance(value, bool) or value is None or isinstance(value, (dict, list, tuple)):
+    if (
+        isinstance(value, bool)
+        or value is None
+        or isinstance(value, (dict, list, tuple))
+    ):
         raise BalanceQueryError("invalid_response", f"余额接口返回的{label}格式无效")
     try:
         number = Decimal(str(value))
     except (InvalidOperation, ValueError, TypeError):
-        raise BalanceQueryError("invalid_response", f"余额接口返回的{label}格式无效") from None
+        raise BalanceQueryError(
+            "invalid_response", f"余额接口返回的{label}格式无效"
+        ) from None
     if not number.is_finite():
         raise BalanceQueryError("invalid_response", f"余额接口返回的{label}格式无效")
     return format(number, "f")
@@ -217,7 +351,11 @@ def _parse_decimal(value: object, label: str = "余额") -> str:
 
 def _currency(value: object, fallback: str = "") -> str:
     candidate = _text(value) or _text(fallback)
-    if not candidate or len(candidate) > 12 or not re.fullmatch(r"[A-Za-z0-9_-]+", candidate):
+    if (
+        not candidate
+        or len(candidate) > 12
+        or not re.fullmatch(r"[A-Za-z0-9_-]+", candidate)
+    ):
         raise BalanceQueryError("invalid_response", "余额接口返回的币种格式无效")
     return candidate.upper()
 
@@ -236,7 +374,9 @@ def _read_pointer(document: object, pointer: str) -> object:
             char = raw_token[index]
             if char == "~":
                 if index + 1 >= len(raw_token) or raw_token[index + 1] not in "01":
-                    raise BalanceQueryError("invalid_configuration", "JSON Pointer 转义格式无效")
+                    raise BalanceQueryError(
+                        "invalid_configuration", "JSON Pointer 转义格式无效"
+                    )
                 token_chars.append("~" if raw_token[index + 1] == "0" else "/")
                 index += 2
             else:
@@ -249,11 +389,15 @@ def _read_pointer(document: object, pointer: str) -> object:
             current = current[token]
         elif isinstance(current, list):
             if not token.isdigit() or (len(token) > 1 and token.startswith("0")):
-                raise BalanceQueryError("invalid_configuration", "JSON Pointer 数组下标无效")
+                raise BalanceQueryError(
+                    "invalid_configuration", "JSON Pointer 数组下标无效"
+                )
             try:
                 current = current[int(token)]
             except IndexError:
-                raise BalanceQueryError("invalid_response", "余额接口缺少已映射的字段") from None
+                raise BalanceQueryError(
+                    "invalid_response", "余额接口缺少已映射的字段"
+                ) from None
         else:
             raise BalanceQueryError("invalid_response", "余额接口缺少已映射的字段")
     return current
@@ -306,13 +450,22 @@ def _volcengine_signature(
     )
     scope = f"{short_date}/{region}/billing/request"
     string_to_sign = "\n".join(
-        ("HMAC-SHA256", date_text, scope, hashlib.sha256(canonical_request.encode()).hexdigest())
+        (
+            "HMAC-SHA256",
+            date_text,
+            scope,
+            hashlib.sha256(canonical_request.encode()).hexdigest(),
+        )
     )
-    key_date = hmac.new(secret_access_key.encode(), short_date.encode(), hashlib.sha256).digest()
+    key_date = hmac.new(
+        secret_access_key.encode(), short_date.encode(), hashlib.sha256
+    ).digest()
     key_region = hmac.new(key_date, region.encode(), hashlib.sha256).digest()
     key_service = hmac.new(key_region, b"billing", hashlib.sha256).digest()
     signing_key = hmac.new(key_service, b"request", hashlib.sha256).digest()
-    signature = hmac.new(signing_key, string_to_sign.encode(), hashlib.sha256).hexdigest()
+    signature = hmac.new(
+        signing_key, string_to_sign.encode(), hashlib.sha256
+    ).hexdigest()
     return (
         "HMAC-SHA256 Credential="
         f"{access_key_id}/{scope}, SignedHeaders={signed_headers}, Signature={signature}"
@@ -330,7 +483,14 @@ class BalanceService:
         cache_ttl: Cache lifetime for successful and failed responses.
     """
 
-    def __init__(self, context, store, transport=None, timeout: float = 8.0, cache_ttl: float = 30.0):
+    def __init__(
+        self,
+        context,
+        store,
+        transport=None,
+        timeout: float = 8.0,
+        cache_ttl: float = 30.0,
+    ):
         self.context = context
         self.store = store
         self.transport = transport
@@ -365,8 +525,15 @@ class BalanceService:
             if not isinstance(raw, Mapping):
                 raise ValueError(f"{label} 必须是对象")
             allowed = {
-                "id", "alias", "kind", "provider_ids", "credential_ref", "settings",
-                "origin", "scan_status", "scan_note",
+                "id",
+                "alias",
+                "kind",
+                "provider_ids",
+                "credential_ref",
+                "settings",
+                "origin",
+                "scan_status",
+                "scan_note",
             }
             if set(raw) - allowed:
                 raise ValueError(f"{label} 包含未知字段")
@@ -399,7 +566,12 @@ class BalanceService:
             record_id = _text(raw.get("id"))
             if not record_id:
                 seed = json.dumps(
-                    {"alias": alias, "kind": kind, "provider_ids": provider_ids, "index": index},
+                    {
+                        "alias": alias,
+                        "kind": kind,
+                        "provider_ids": provider_ids,
+                        "index": index,
+                    },
                     ensure_ascii=False,
                     sort_keys=True,
                 )
@@ -412,7 +584,9 @@ class BalanceService:
             if not isinstance(origin, str) or origin not in {"scan", "manual"}:
                 raise ValueError(f"{label}.origin 只能是 scan 或 manual")
             if not isinstance(scan_status, str) or scan_status not in {
-                "configured", "needs_configuration", "unrecognized"
+                "configured",
+                "needs_configuration",
+                "unrecognized",
             }:
                 raise ValueError(f"{label}.scan_status 无效")
             credential_ref = raw.get("credential_ref", "")
@@ -450,7 +624,9 @@ class BalanceService:
         updated = []
         needs_configuration = []
         result_records = copy.deepcopy(existing)
-        result_index_by_id = {item["id"]: index for index, item in enumerate(result_records)}
+        result_index_by_id = {
+            item["id"]: index for index, item in enumerate(result_records)
+        }
 
         for item in discovered:
             provider_ids = item["provider_ids"]
@@ -458,7 +634,9 @@ class BalanceService:
             for provider_id in provider_ids:
                 matches.extend(existing_by_provider.get(provider_id, []))
             matches = list({record["id"]: record for record in matches}.values())
-            manual_matches = [record for record in matches if record["origin"] == "manual"]
+            manual_matches = [
+                record for record in matches if record["origin"] == "manual"
+            ]
             manual_bound_ids = set()
             if manual_matches:
                 manual_bound_ids = {
@@ -468,7 +646,11 @@ class BalanceService:
                 }
                 # A manual binding owns only its explicitly listed Provider IDs. If a
                 # discovered shared source also has unbound models, keep those visible.
-                provider_ids = [provider_id for provider_id in provider_ids if provider_id not in manual_bound_ids]
+                provider_ids = [
+                    provider_id
+                    for provider_id in provider_ids
+                    if provider_id not in manual_bound_ids
+                ]
                 claimed.update(manual_bound_ids)
                 if not provider_ids:
                     continue
@@ -479,7 +661,13 @@ class BalanceService:
                 matches = []
                 for provider_id in provider_ids:
                     matches.extend(existing_by_provider.get(provider_id, []))
-                matches = list({record["id"]: record for record in matches if record["origin"] != "manual"}.values())
+                matches = list(
+                    {
+                        record["id"]: record
+                        for record in matches
+                        if record["origin"] != "manual"
+                    }.values()
+                )
 
             target = matches[0] if matches else None
             duplicate_scan_ids = {
@@ -513,7 +701,9 @@ class BalanceService:
                 current["scan_status"] = item["scan_status"]
                 current["scan_note"] = item["scan_note"]
                 if _text(current["settings"].get("api_key")) and current["kind"] in {
-                    "deepseek", "kimi", "openrouter"
+                    "deepseek",
+                    "kimi",
+                    "openrouter",
                 }:
                     current["scan_status"] = "configured"
                     current["scan_note"] = ""
@@ -524,7 +714,9 @@ class BalanceService:
                 target = current
             if duplicate_scan_ids:
                 result_records = [
-                    record for record in result_records if record["id"] not in duplicate_scan_ids
+                    record
+                    for record in result_records
+                    if record["id"] not in duplicate_scan_ids
                 ]
                 for duplicate_id in duplicate_scan_ids:
                     result_index_by_id.pop(duplicate_id, None)
@@ -536,15 +728,23 @@ class BalanceService:
                 needs_configuration.append(copy.deepcopy(target))
 
         # Keep stale scan records, marking provider mismatches instead of deleting them.
-        seen_provider_ids = {provider_id for item in discovered for provider_id in item["provider_ids"]}
+        seen_provider_ids = {
+            provider_id for item in discovered for provider_id in item["provider_ids"]
+        }
         for record in result_records:
             if record["origin"] != "scan" or not record["provider_ids"]:
                 continue
             if record["id"] in {item["id"] for item in added}:
                 continue
-            if any(provider_id in seen_provider_ids for provider_id in record["provider_ids"]):
+            if any(
+                provider_id in seen_provider_ids
+                for provider_id in record["provider_ids"]
+            ):
                 continue
-            if record["scan_status"] != "unrecognized" or record["scan_note"] != "未找到原 Provider；请重新绑定或手动检查。":
+            if (
+                record["scan_status"] != "unrecognized"
+                or record["scan_note"] != "未找到原 Provider；请重新绑定或手动检查。"
+            ):
                 record["scan_status"] = "unrecognized"
                 record["scan_note"] = "未找到原 Provider；请重新绑定或手动检查。"
                 if not any(item["id"] == record["id"] for item in updated):
@@ -616,7 +816,9 @@ class BalanceService:
                     note = "仅识别到模型 API 域名；余额接口需单独配置 URL 和 JSON Pointer 字段映射。"
                 else:
                     status = "unrecognized"
-                    note = "未识别的余额接口域名；需手动配置独立余额 HTTP 地址和字段映射。"
+                    note = (
+                        "未识别的余额接口域名；需手动配置独立余额 HTTP 地址和字段映射。"
+                    )
                     if not effective_base:
                         note = "Provider 未提供 API Base；需手动配置独立余额 HTTP 地址和字段映射。"
             elif kind == "openrouter":
@@ -666,21 +868,43 @@ class BalanceService:
             if kind == "custom":
                 group_status = "unrecognized"
                 group_note = items[0]["note"]
-            elif kind in {"openrouter", "aliyun", "volcengine", "custom_openai", "custom_anthropic"}:
+            elif kind in {
+                "openrouter",
+                "aliyun",
+                "volcengine",
+                "custom_openai",
+                "custom_anthropic",
+            }:
                 group_status = "needs_configuration"
                 group_note = items[0]["note"]
             else:
                 key_counts = {item["status"] for item in items}
-                group_status = "configured" if key_counts == {"configured"} else "needs_configuration"
-                group_note = "" if group_status == "configured" else next(
-                    (item["note"] for item in items if item["status"] != "configured"),
-                    "Provider 余额凭证需手动配置。",
+                group_status = (
+                    "configured"
+                    if key_counts == {"configured"}
+                    else "needs_configuration"
+                )
+                group_note = (
+                    ""
+                    if group_status == "configured"
+                    else next(
+                        (
+                            item["note"]
+                            for item in items
+                            if item["status"] != "configured"
+                        ),
+                        "Provider 余额凭证需手动配置。",
+                    )
                 )
             label = _CATALOG_BY_KIND[kind]["label"]
             alias_prefix = re.sub(r"\s+", "", label.split("（")[0])
             slug = re.sub(r"\s+", "", source_group)
             slug = re.sub(r"[^\w-]+", "", slug, flags=re.UNICODE)[:20]
-            alias = f"{alias_prefix}-{slug}" if slug else f"{alias_prefix}-{provider_ids[0]}"
+            alias = (
+                f"{alias_prefix}-{slug}"
+                if slug
+                else f"{alias_prefix}-{provider_ids[0]}"
+            )
             seed = f"{kind}:{source_group}"
             stable_id = "scan-" + hashlib.sha256(seed.encode()).hexdigest()[:16]
             credential_ref = provider_ids[0] if len(provider_ids) == 1 else ""
@@ -720,7 +944,11 @@ class BalanceService:
             if isinstance(value, list):
                 for item in value:
                     if isinstance(item, Mapping):
-                        item_id = _text(item.get("id") or item.get("provider_id") or item.get("provider_source_id"))
+                        item_id = _text(
+                            item.get("id")
+                            or item.get("provider_id")
+                            or item.get("provider_source_id")
+                        )
                         if item_id:
                             result[item_id] = item
             elif isinstance(value, Mapping):
@@ -760,7 +988,9 @@ class BalanceService:
     def _provider_key_count(provider_config: Mapping) -> int:
         keys = provider_config.get("key")
         if isinstance(keys, list):
-            return sum(1 for item in keys if isinstance(item, str) and bool(item.strip()))
+            return sum(
+                1 for item in keys if isinstance(item, str) and bool(item.strip())
+            )
         if isinstance(keys, str):
             return int(bool(keys.strip()))
         return 0
@@ -813,35 +1043,56 @@ class BalanceService:
     async def query_all(self) -> list[dict]:
         """Query all configured records independently and preserve their order."""
         config = self._store_config()
-        records = config.get("balance_providers", []) if isinstance(config, Mapping) else []
+        records = (
+            config.get("balance_providers", []) if isinstance(config, Mapping) else []
+        )
         try:
             canonical = self.normalize_records(records)
         except (TypeError, ValueError):
             return []
-        return list(await asyncio.gather(*(self.query_record(item) for item in canonical)))
+        return list(
+            await asyncio.gather(*(self.query_record(item) for item in canonical))
+        )
 
     async def _run_query(self, record: dict, cache_key: tuple[str, str]) -> dict:
         try:
-            result = await asyncio.wait_for(self._query_uncached(record), timeout=self.timeout)
+            result = await asyncio.wait_for(
+                self._query_uncached(record), timeout=self.timeout
+            )
         except asyncio.TimeoutError:
             result = self._failure(record, "timeout", "余额查询超时。")
         except BalanceQueryError as error:
             result = self._failure(record, error.code, error.message)
         except Exception:
-            result = self._failure(record, "network", "余额查询失败，请检查网络或接口设置。")
+            result = self._failure(
+                record, "network", "余额查询失败，请检查网络或接口设置。"
+            )
         if self._is_current_record(record):
             self._cache[cache_key] = (time.monotonic(), copy.deepcopy(result))
         else:
-            result = self._failure(record, "config_changed", "余额配置已更新，请重新查询。")
+            result = self._failure(
+                record, "config_changed", "余额配置已更新，请重新查询。"
+            )
         return result
 
     async def _query_uncached(self, record: dict) -> dict:
-        if record["scan_status"] == "unrecognized" and not self._has_explicit_config(record):
-            raise BalanceQueryError("unrecognized", "此 Provider 未识别余额接口，请先手动配置。")
-        if record["scan_status"] == "needs_configuration" and not self._has_explicit_config(record):
+        if record["scan_status"] == "unrecognized" and not self._has_explicit_config(
+            record
+        ):
+            raise BalanceQueryError(
+                "unrecognized", "此 Provider 未识别余额接口，请先手动配置。"
+            )
+        if record[
+            "scan_status"
+        ] == "needs_configuration" and not self._has_explicit_config(record):
             if record["kind"] == "openrouter":
-                raise BalanceQueryError("needs_configuration", "OpenRouter 余额查询需要单独填写 Management Key。")
-            raise BalanceQueryError("needs_configuration", "余额查询信息尚未配置，请补充凭证和接口设置。")
+                raise BalanceQueryError(
+                    "needs_configuration",
+                    "OpenRouter 余额查询需要单独填写 Management Key。",
+                )
+            raise BalanceQueryError(
+                "needs_configuration", "余额查询信息尚未配置，请补充凭证和接口设置。"
+            )
         settings = record["settings"]
         kind = record["kind"]
         if kind in {"aliyun", "volcengine"}:
@@ -855,8 +1106,13 @@ class BalanceService:
                 else self._resolve_api_key(record, required=requires_key)
             )
             if kind == "openrouter" and not _text(settings.get("api_key")):
-                raise BalanceQueryError("needs_configuration", "OpenRouter 余额查询需要单独填写 Management Key。")
-            if kind in _CUSTOM_KINDS:
+                raise BalanceQueryError(
+                    "needs_configuration",
+                    "OpenRouter 余额查询需要单独填写 Management Key。",
+                )
+            if kind == "newapi":
+                rows = await self._query_newapi(record, api_key)
+            elif kind in _CUSTOM_KINDS:
                 rows = await self._query_custom(record, api_key)
             else:
                 rows = await self._query_standard(kind, record, api_key)
@@ -875,10 +1131,21 @@ class BalanceService:
     @staticmethod
     def _has_explicit_config(record: Mapping) -> bool:
         settings = record["settings"]
+        if record["kind"] == "newapi":
+            return bool(
+                _text(settings.get("base_url"))
+                and (
+                    _text(settings.get("api_key"))
+                    or _text(record.get("credential_ref"))
+                )
+            )
         if record["kind"] == "openrouter":
             return bool(_text(settings.get("api_key")))
         if record["kind"] in {"aliyun", "volcengine"}:
-            return bool(_text(settings.get("access_key_id")) and _text(settings.get("access_key_secret")))
+            return bool(
+                _text(settings.get("access_key_id"))
+                and _text(settings.get("access_key_secret"))
+            )
         if record["kind"] in _CUSTOM_KINDS:
             fields = settings.get("fields")
             return bool(
@@ -886,7 +1153,9 @@ class BalanceService:
                 and isinstance(fields, Mapping)
                 and _text(fields.get("余额"))
             )
-        return bool(_text(settings.get("api_key")) or _text(record.get("credential_ref")))
+        return bool(
+            _text(settings.get("api_key")) or _text(record.get("credential_ref"))
+        )
 
     def _resolve_api_key(self, record: Mapping, *, required: bool) -> str:
         # Explicit settings take precedence, including a custom Management Key.
@@ -895,30 +1164,49 @@ class BalanceService:
             return explicit
         if record["kind"] == "openrouter":
             if required:
-                raise BalanceQueryError("needs_configuration", "OpenRouter 余额查询需要单独填写 Management Key。")
+                raise BalanceQueryError(
+                    "needs_configuration",
+                    "OpenRouter 余额查询需要单独填写 Management Key。",
+                )
             return ""
         provider_id = _text(record.get("credential_ref"))
         provider_ids = []
         if provider_id:
             provider_ids.append(provider_id)
         provider_ids.extend(
-            candidate for candidate in record.get("provider_ids", [])
+            candidate
+            for candidate in record.get("provider_ids", [])
             if isinstance(candidate, str) and candidate not in provider_ids
         )
         for provider_id in provider_ids:
             provider = self._find_provider(provider_id)
-            provider_config = getattr(provider, "provider_config", {}) if provider is not None else {}
-            keys = provider_config.get("key") if isinstance(provider_config, Mapping) else None
+            provider_config = (
+                getattr(provider, "provider_config", {}) if provider is not None else {}
+            )
+            keys = (
+                provider_config.get("key")
+                if isinstance(provider_config, Mapping)
+                else None
+            )
             if isinstance(keys, str):
                 keys = [keys]
             if isinstance(keys, list):
-                values = [item.strip() for item in keys if isinstance(item, str) and item.strip()]
+                values = [
+                    item.strip()
+                    for item in keys
+                    if isinstance(item, str) and item.strip()
+                ]
                 if len(values) == 1:
                     return values[0]
                 if len(values) > 1:
-                    raise BalanceQueryError("needs_configuration", "Provider 配置了多个 Key，无法安全选择余额账户。")
+                    raise BalanceQueryError(
+                        "needs_configuration",
+                        "Provider 配置了多个 Key，无法安全选择余额账户。",
+                    )
         if required:
-            raise BalanceQueryError("needs_configuration", "余额查询凭证尚未配置或无法解析。")
+            raise BalanceQueryError(
+                "needs_configuration", "余额查询凭证尚未配置或无法解析。"
+            )
         return ""
 
     def _find_provider(self, provider_id: str):
@@ -939,7 +1227,9 @@ class BalanceService:
                 return provider
         return None
 
-    async def _query_standard(self, kind: str, record: dict, api_key: str) -> list[dict]:
+    async def _query_standard(
+        self, kind: str, record: dict, api_key: str
+    ) -> list[dict]:
         settings = record["settings"]
         url = _text(settings.get("url"))
         if not url:
@@ -948,19 +1238,29 @@ class BalanceService:
         payload = await self._http_json("GET", url, headers=headers)
         fallback_currency = _text(settings.get("currency"))
         if kind == "deepseek":
-            entries = payload.get("balance_infos") if isinstance(payload, Mapping) else None
+            entries = (
+                payload.get("balance_infos") if isinstance(payload, Mapping) else None
+            )
             if not isinstance(entries, list) or not entries:
-                raise BalanceQueryError("invalid_response", "DeepSeek 返回的余额列表格式无效。")
+                raise BalanceQueryError(
+                    "invalid_response", "DeepSeek 返回的余额列表格式无效。"
+                )
             rows = []
             for entry in entries:
                 if not isinstance(entry, Mapping):
-                    raise BalanceQueryError("invalid_response", "DeepSeek 返回的余额列表格式无效。")
+                    raise BalanceQueryError(
+                        "invalid_response", "DeepSeek 返回的余额列表格式无效。"
+                    )
                 rows.append(
                     {
                         "余额": _parse_decimal(entry.get("total_balance")),
                         "币种": _currency(entry.get("currency"), fallback_currency),
-                        "赠送余额": _parse_decimal(entry.get("granted_balance"), "赠送余额"),
-                        "充值余额": _parse_decimal(entry.get("topped_up_balance"), "充值余额"),
+                        "赠送余额": _parse_decimal(
+                            entry.get("granted_balance"), "赠送余额"
+                        ),
+                        "充值余额": _parse_decimal(
+                            entry.get("topped_up_balance"), "充值余额"
+                        ),
                     }
                 )
             return rows
@@ -968,8 +1268,12 @@ class BalanceService:
             if not isinstance(payload, Mapping):
                 raise BalanceQueryError("invalid_response", "Kimi 返回的余额格式无效。")
             code = payload.get("code")
-            if payload.get("status") is False or (code is not None and str(code) != "0"):
-                raise BalanceQueryError("provider_error", "Kimi 余额查询失败或凭证无效。")
+            if payload.get("status") is False or (
+                code is not None and str(code) != "0"
+            ):
+                raise BalanceQueryError(
+                    "provider_error", "Kimi 余额查询失败或凭证无效。"
+                )
             data = payload.get("data")
             if not isinstance(data, Mapping):
                 raise BalanceQueryError("invalid_response", "Kimi 返回的余额格式无效。")
@@ -977,25 +1281,310 @@ class BalanceService:
                 {
                     "余额": _parse_decimal(data.get("available_balance")),
                     "币种": _currency(fallback_currency or "CNY"),
-                    "代金券余额": _parse_decimal(data.get("voucher_balance"), "代金券余额"),
+                    "代金券余额": _parse_decimal(
+                        data.get("voucher_balance"), "代金券余额"
+                    ),
                     "现金余额": _parse_decimal(data.get("cash_balance"), "现金余额"),
                 }
             ]
         if kind == "openrouter":
             data = payload.get("data") if isinstance(payload, Mapping) else None
             if not isinstance(data, Mapping):
-                raise BalanceQueryError("invalid_response", "OpenRouter 返回的额度格式无效。")
+                raise BalanceQueryError(
+                    "invalid_response", "OpenRouter 返回的额度格式无效。"
+                )
             total = Decimal(_parse_decimal(data.get("total_credits"), "总额度"))
             used = Decimal(_parse_decimal(data.get("total_usage"), "已用额度"))
-            return [{"余额": format(total - used, "f"), "币种": _currency(fallback_currency or "USD")}]
+            return [
+                {
+                    "余额": format(total - used, "f"),
+                    "币种": _currency(fallback_currency or "USD"),
+                }
+            ]
         raise BalanceQueryError("invalid_configuration", "余额适配器配置无效。")
+
+    @staticmethod
+    def _newapi_urls(base_url: object) -> tuple[str, str]:
+        """Validate a NewAPI site URL and derive its usage and public status endpoints."""
+        value = _text(base_url)
+        if not value or any(char.isspace() or ord(char) < 32 for char in value):
+            raise BalanceQueryError(
+                "needs_configuration", "请填写有效的 NewAPI 站点地址。"
+            )
+        if "?" in value or "#" in value:
+            raise BalanceQueryError(
+                "invalid_configuration", "NewAPI 站点地址不能包含查询参数或片段。"
+            )
+        try:
+            parsed = urlsplit(value)
+            # Accessing port validates malformed ports; credentials in the authority
+            # are rejected so they can never be forwarded or included in endpoint URLs.
+            _ = parsed.port
+        except ValueError:
+            raise BalanceQueryError(
+                "invalid_configuration", "NewAPI 站点地址格式无效。"
+            ) from None
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+            raise BalanceQueryError(
+                "invalid_configuration",
+                "NewAPI 站点地址必须使用 http(s) 且包含主机名。",
+            )
+        if parsed.username is not None or parsed.password is not None:
+            raise BalanceQueryError(
+                "invalid_configuration", "NewAPI 站点地址不能内嵌账号或凭证。"
+            )
+        if any(char.isspace() or ord(char) < 33 for char in parsed.hostname):
+            raise BalanceQueryError(
+                "invalid_configuration", "NewAPI 站点地址主机名格式无效。"
+            )
+
+        path = parsed.path.rstrip("/")
+        lower_path = path.lower()
+        for suffix in ("/api/usage/token", "/api/status", "/v1"):
+            if lower_path.endswith(suffix):
+                path = path[: -len(suffix)]
+                break
+        base = f"{parsed.scheme.lower()}://{parsed.netloc}{path.rstrip('/')}"
+        return f"{base}/api/usage/token/", f"{base}/api/status"
+
+    @staticmethod
+    def _newapi_data(payload: object, *, source: str) -> Mapping:
+        if not isinstance(payload, Mapping):
+            raise BalanceQueryError(
+                "invalid_response", f"NewAPI {source}接口返回格式无效。"
+            )
+        if "code" not in payload and "success" not in payload:
+            raise BalanceQueryError(
+                "invalid_response", f"NewAPI {source}接口返回格式无效。"
+            )
+        if "code" in payload and payload.get("code") is not True:
+            raise BalanceQueryError(
+                "provider_error", f"NewAPI {source}接口查询失败或权限不足。"
+            )
+        if "success" in payload and payload.get("success") is not True:
+            raise BalanceQueryError(
+                "provider_error", f"NewAPI {source}接口查询失败或权限不足。"
+            )
+        data = payload.get("data")
+        if not isinstance(data, Mapping):
+            raise BalanceQueryError(
+                "invalid_response", f"NewAPI {source}接口返回格式无效。"
+            )
+        if source == "令牌用量" and data.get("object") != "token_usage":
+            raise BalanceQueryError("invalid_response", "NewAPI 令牌用量响应类型无效。")
+        return data
+
+    @staticmethod
+    def _newapi_metadata_number(value: object, label: str, *, manual: bool) -> Decimal:
+        code = "invalid_configuration" if manual else "newapi_metadata"
+        message = (
+            f"NewAPI 的{label}必须是有限正数，请补全有效参数或改选 QUOTA 原始单位。"
+        )
+        if (
+            isinstance(value, bool)
+            or value is None
+            or isinstance(value, (Mapping, list, tuple))
+        ):
+            raise BalanceQueryError(code, message)
+        try:
+            number = Decimal(str(value).strip())
+        except (InvalidOperation, ValueError, TypeError):
+            raise BalanceQueryError(code, message) from None
+        if not number.is_finite() or number <= 0:
+            raise BalanceQueryError(code, message)
+        return number
+
+    @staticmethod
+    def _newapi_custom_symbol(value: object, *, manual: bool) -> str:
+        code = "invalid_configuration" if manual else "newapi_metadata"
+        message = (
+            "NewAPI 自定义币种符号无效，请填写安全的纯文本符号或改选 QUOTA 原始单位。"
+        )
+        if not isinstance(value, str) or any(
+            unicodedata.category(char) == "Cc" for char in value
+        ):
+            raise BalanceQueryError(code, message)
+        symbol = _text(value)
+        if not symbol or len(symbol) > 64:
+            raise BalanceQueryError(code, message)
+        return symbol
+
+    async def _query_newapi(self, record: dict, api_key: str) -> list[dict]:
+        settings = record["settings"]
+        usage_url, status_url = self._newapi_urls(settings.get("base_url"))
+        scope = _text(settings.get("quota_scope", "account")).lower() or "account"
+        if scope not in {"account", "token"}:
+            raise BalanceQueryError(
+                "invalid_configuration", "NewAPI 查询范围只能是 account 或 token。"
+            )
+        unit_setting = _text(settings.get("display_unit", "auto")).upper() or "AUTO"
+        if unit_setting not in {"AUTO", "CNY", "USD", "QUOTA"}:
+            raise BalanceQueryError("invalid_configuration", "NewAPI 显示单位无效。")
+        if not api_key:
+            raise BalanceQueryError(
+                "needs_configuration", "NewAPI 查询需要 API Key 或绑定 Provider 凭证。"
+            )
+
+        payload = await self._http_json(
+            "GET", usage_url, headers={"Authorization": f"Bearer {api_key}"}
+        )
+        data = self._newapi_data(payload, source="令牌用量")
+        if scope == "token":
+            unlimited = data.get("unlimited_quota")
+            if not isinstance(unlimited, bool):
+                raise BalanceQueryError(
+                    "invalid_response", "NewAPI 令牌不限额字段格式无效。"
+                )
+            if unlimited:
+                return [{"余额": "不限额", "币种": "", "查询范围": "令牌"}]
+        if scope == "account":
+            user_quota = data.get("user_quota")
+            if (
+                not isinstance(user_quota, Mapping)
+                or "total_available" not in user_quota
+            ):
+                raise BalanceQueryError(
+                    "account_quota_unavailable",
+                    "无法读取 NewAPI 账户总额度；当前 Key 可能无账户额度权限，或站点版本不支持该字段。请检查权限和版本。",
+                )
+            raw_value = user_quota.get("total_available")
+        else:
+            if "total_available" not in data:
+                raise BalanceQueryError(
+                    "invalid_response", "NewAPI 令牌响应缺少可用额度字段。"
+                )
+            raw_value = data.get("total_available")
+        raw_quota = Decimal(_parse_decimal(raw_value, "可用额度"))
+
+        if unit_setting == "QUOTA":
+            return [
+                {
+                    "余额": format(raw_quota, "f"),
+                    "币种": "QUOTA",
+                    "查询范围": "账户" if scope == "account" else "令牌",
+                }
+            ]
+
+        manual_values = {}
+        for name in (
+            "quota_per_unit",
+            "usd_exchange_rate",
+            "custom_currency_symbol",
+            "custom_currency_exchange_rate",
+        ):
+            value = settings.get(name)
+            manual_values[name] = (
+                value
+                if value is not None
+                and not (isinstance(value, str) and not value.strip())
+                else None
+            )
+
+        required_numbers = {
+            "USD": ("quota_per_unit",),
+            "CNY": ("quota_per_unit", "usd_exchange_rate"),
+        }
+        needs_status = unit_setting == "AUTO" or any(
+            manual_values.get(name) is None
+            for name in required_numbers.get(unit_setting, ())
+        )
+        status_data = {}
+        if needs_status:
+            try:
+                status_payload = await self._http_json("GET", status_url)
+                status_data = dict(self._newapi_data(status_payload, source="站点状态"))
+            except asyncio.TimeoutError:
+                raise BalanceQueryError(
+                    "newapi_metadata",
+                    "读取 NewAPI 站点显示配置超时，请补全单位换算参数或改选 QUOTA 原始单位。",
+                ) from None
+            except BalanceQueryError:
+                raise BalanceQueryError(
+                    "newapi_metadata",
+                    "无法读取 NewAPI 站点显示配置，请补全单位换算参数或改选 QUOTA 原始单位。",
+                ) from None
+
+        if unit_setting == "AUTO":
+            unit = _text(status_data.get("quota_display_type")).upper()
+            if unit not in {"USD", "CNY", "TOKENS", "CUSTOM"}:
+                raise BalanceQueryError(
+                    "newapi_metadata",
+                    "NewAPI 站点未提供有效的额度显示单位，请补全单位换算参数或改选 QUOTA 原始单位。",
+                )
+        else:
+            unit = unit_setting
+
+        query_scope = "账户" if scope == "account" else "令牌"
+        if unit == "TOKENS":
+            return [
+                {
+                    "余额": format(raw_quota, "f"),
+                    "币种": "QUOTA",
+                    "查询范围": query_scope,
+                }
+            ]
+
+        def parameter(name: str, label: str) -> Decimal:
+            value = manual_values.get(name)
+            manual = value is not None
+            if value is None:
+                value = status_data.get(name)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                raise BalanceQueryError(
+                    "newapi_metadata",
+                    "NewAPI 单位换算配置缺失，请补全对应参数或改选 QUOTA 原始单位。",
+                )
+            return self._newapi_metadata_number(value, label, manual=manual)
+
+        try:
+            if unit == "USD":
+                amount = raw_quota / parameter("quota_per_unit", "每单位配额")
+                currency = "USD"
+            elif unit == "CNY":
+                amount = (
+                    raw_quota
+                    / parameter("quota_per_unit", "每单位配额")
+                    * parameter("usd_exchange_rate", "美元兑人民币汇率")
+                )
+                currency = "CNY"
+            elif unit == "CUSTOM":
+                amount = (
+                    raw_quota
+                    / parameter("quota_per_unit", "每单位配额")
+                    * parameter("custom_currency_exchange_rate", "自定义币种汇率")
+                )
+                symbol = manual_values.get("custom_currency_symbol")
+                manual_symbol = symbol is not None
+                if symbol is None:
+                    symbol = status_data.get("custom_currency_symbol")
+                currency = self._newapi_custom_symbol(symbol, manual=manual_symbol)
+            else:
+                raise BalanceQueryError(
+                    "newapi_metadata",
+                    "NewAPI 额度显示单位无效，请补全单位参数或改选 QUOTA 原始单位。",
+                )
+            if not amount.is_finite():
+                raise BalanceQueryError(
+                    "newapi_metadata",
+                    "NewAPI 单位换算结果无效，请检查配置参数或改选 QUOTA 原始单位。",
+                )
+        except (ArithmeticError, InvalidOperation):
+            raise BalanceQueryError(
+                "newapi_metadata",
+                "NewAPI 单位换算失败，请检查配置参数或改选 QUOTA 原始单位。",
+            ) from None
+        return [
+            {"余额": format(amount, "f"), "币种": currency, "查询范围": query_scope}
+        ]
 
     async def _query_cloud(self, kind: str, record: dict) -> list[dict]:
         settings = record["settings"]
         access_key_id = _text(settings.get("access_key_id"))
         secret = _text(settings.get("access_key_secret"))
         if not access_key_id or not secret:
-            raise BalanceQueryError("needs_configuration", "云账户 AccessKey ID 和 Secret 需单独配置。")
+            raise BalanceQueryError(
+                "needs_configuration", "云账户 AccessKey ID 和 Secret 需单独配置。"
+            )
         url = (
             "https://business.aliyuncs.com/"
             if kind == "aliyun"
@@ -1004,7 +1593,10 @@ class BalanceService:
         fallback_currency = _text(settings.get("currency")) or "CNY"
         if kind == "aliyun":
             if self._host(url) != "business.aliyuncs.com":
-                raise BalanceQueryError("invalid_configuration", "阿里云 BSS 仅向官方 business.aliyuncs.com 地址发送凭证。")
+                raise BalanceQueryError(
+                    "invalid_configuration",
+                    "阿里云 BSS 仅向官方 business.aliyuncs.com 地址发送凭证。",
+                )
             params = {
                 "Action": "QueryAccountBalance",
                 "AccessKeyId": access_key_id,
@@ -1018,18 +1610,29 @@ class BalanceService:
             params["Signature"] = _aliyun_signature(secret, params)
             payload = await self._http_json("GET", url, params=params)
             if not isinstance(payload, Mapping) or payload.get("Success") is False:
-                raise BalanceQueryError("provider_error", "阿里云 BSS 余额查询失败或权限不足。")
+                raise BalanceQueryError(
+                    "provider_error", "阿里云 BSS 余额查询失败或权限不足。"
+                )
             data = payload.get("Data")
-            if not isinstance(data, Mapping) or ("Code" in payload and str(payload.get("Code")) != "200"):
-                raise BalanceQueryError("provider_error", "阿里云 BSS 余额查询失败或权限不足。")
-            return [{
-                "余额": _parse_decimal(data.get("AvailableAmount")),
-                "币种": _currency(data.get("Currency"), fallback_currency),
-            }]
+            if not isinstance(data, Mapping) or (
+                "Code" in payload and str(payload.get("Code")) != "200"
+            ):
+                raise BalanceQueryError(
+                    "provider_error", "阿里云 BSS 余额查询失败或权限不足。"
+                )
+            return [
+                {
+                    "余额": _parse_decimal(data.get("AvailableAmount")),
+                    "币种": _currency(data.get("Currency"), fallback_currency),
+                }
+            ]
 
         region = _text(settings.get("region")) or "cn-beijing"
         if self._host(url) != "billing.volcengineapi.com":
-            raise BalanceQueryError("invalid_configuration", "火山引擎余额查询仅支持官方 billing.volcengineapi.com 地址。")
+            raise BalanceQueryError(
+                "invalid_configuration",
+                "火山引擎余额查询仅支持官方 billing.volcengineapi.com 地址。",
+            )
         date_text = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         query = {"Action": "QueryBalanceAcct", "Version": "2022-01-01"}
         host = urlsplit(url).hostname or "billing.volcengineapi.com"
@@ -1044,11 +1647,15 @@ class BalanceService:
         )
         data = payload.get("Result") if isinstance(payload, Mapping) else None
         if not isinstance(data, Mapping):
-            raise BalanceQueryError("provider_error", "火山引擎余额查询失败或权限不足。")
-        return [{
-            "余额": _parse_decimal(data.get("AvailableBalance")),
-            "币种": _currency(fallback_currency),
-        }]
+            raise BalanceQueryError(
+                "provider_error", "火山引擎余额查询失败或权限不足。"
+            )
+        return [
+            {
+                "余额": _parse_decimal(data.get("AvailableBalance")),
+                "币种": _currency(fallback_currency),
+            }
+        ]
 
     async def _query_custom(self, record: dict, api_key: str) -> list[dict]:
         settings = record["settings"]
@@ -1059,23 +1666,40 @@ class BalanceService:
         body = settings.get("body", {})
         fields = settings.get("fields", {})
         if not url:
-            raise BalanceQueryError("needs_configuration", "自定义余额接口地址尚未配置。")
+            raise BalanceQueryError(
+                "needs_configuration", "自定义余额接口地址尚未配置。"
+            )
         if method not in {"GET", "POST"}:
-            raise BalanceQueryError("invalid_configuration", "自定义请求方法仅支持 GET 或 POST。")
+            raise BalanceQueryError(
+                "invalid_configuration", "自定义请求方法仅支持 GET 或 POST。"
+            )
         if auth_mode not in {"none", "bearer", "header"}:
             raise BalanceQueryError("invalid_configuration", "自定义认证方式无效。")
-        if not isinstance(headers, Mapping) or not isinstance(body, Mapping) or not isinstance(fields, Mapping):
-            raise BalanceQueryError("invalid_configuration", "自定义 headers、body 和 fields 必须为 JSON 对象。")
+        if (
+            not isinstance(headers, Mapping)
+            or not isinstance(body, Mapping)
+            or not isinstance(fields, Mapping)
+        ):
+            raise BalanceQueryError(
+                "invalid_configuration",
+                "自定义 headers、body 和 fields 必须为 JSON 对象。",
+            )
         if "余额" not in fields or not _text(fields.get("余额")):
-            raise BalanceQueryError("needs_configuration", "请配置“余额”的 JSON Pointer。")
+            raise BalanceQueryError(
+                "needs_configuration", "请配置“余额”的 JSON Pointer。"
+            )
         request_headers = {str(key): str(value) for key, value in headers.items()}
         if auth_mode == "bearer":
             if not api_key:
-                raise BalanceQueryError("needs_configuration", "自定义余额接口需要 API Key。")
+                raise BalanceQueryError(
+                    "needs_configuration", "自定义余额接口需要 API Key。"
+                )
             request_headers["Authorization"] = f"Bearer {api_key}"
         elif auth_mode == "header":
             if not api_key:
-                raise BalanceQueryError("needs_configuration", "自定义余额接口需要 API Key。")
+                raise BalanceQueryError(
+                    "needs_configuration", "自定义余额接口需要 API Key。"
+                )
             auth_header = _text(settings.get("auth_header")) or "Authorization"
             if not re.fullmatch(r"[A-Za-z0-9-]+", auth_header):
                 raise BalanceQueryError("invalid_configuration", "认证请求头名称无效。")
@@ -1133,21 +1757,29 @@ class BalanceService:
                         try:
                             payload = await response.json(content_type=None)
                         except Exception:
-                            raise BalanceQueryError("invalid_response", "余额查询接口未返回有效 JSON。") from None
+                            raise BalanceQueryError(
+                                "invalid_response", "余额查询接口未返回有效 JSON。"
+                            ) from None
         except BalanceQueryError:
             raise
         except asyncio.TimeoutError:
             raise
         except Exception:
-            raise BalanceQueryError("network", "无法连接余额查询接口，请检查网络和地址。") from None
+            raise BalanceQueryError(
+                "network", "无法连接余额查询接口，请检查网络和地址。"
+            ) from None
         if status < 200 or status >= 300:
             if status in {401, 403}:
-                raise BalanceQueryError("authentication", "余额查询认证失败或权限不足。")
+                raise BalanceQueryError(
+                    "authentication", "余额查询认证失败或权限不足。"
+                )
             if status == 404:
                 raise BalanceQueryError("endpoint", "余额查询接口不存在，请检查地址。")
             raise BalanceQueryError("http", "余额查询接口返回 HTTP 错误。")
         if not isinstance(payload, (Mapping, list)):
-            raise BalanceQueryError("invalid_response", "余额查询接口未返回 JSON 对象或数组。")
+            raise BalanceQueryError(
+                "invalid_response", "余额查询接口未返回 JSON 对象或数组。"
+            )
         return payload
 
     @staticmethod
@@ -1164,7 +1796,9 @@ class BalanceService:
             if asyncio.iscoroutine(payload):
                 payload = await payload
             return status, payload
-        raise BalanceQueryError("invalid_response", "测试 HTTP transport 返回格式无效。")
+        raise BalanceQueryError(
+            "invalid_response", "测试 HTTP transport 返回格式无效。"
+        )
 
     def _store_config(self):
         getter = getattr(self.store, "get_config", None)
@@ -1177,11 +1811,15 @@ class BalanceService:
 
     def _is_current_record(self, record: Mapping) -> bool:
         config = self._store_config()
-        records = config.get("balance_providers") if isinstance(config, Mapping) else None
+        records = (
+            config.get("balance_providers") if isinstance(config, Mapping) else None
+        )
         if not isinstance(records, list):
             return True
         for candidate in records:
-            if isinstance(candidate, Mapping) and candidate.get("id") == record.get("id"):
+            if isinstance(candidate, Mapping) and candidate.get("id") == record.get(
+                "id"
+            ):
                 try:
                     normalized = self.normalize_records([dict(candidate)])[0]
                 except (TypeError, ValueError):

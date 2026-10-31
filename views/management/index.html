@@ -807,6 +807,7 @@
           ["balance_openrouter", "OpenRouter 余额", "{别名}：{余额} {币种}", "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"],
           ["balance_aliyun", "阿里云 BSS 余额", "{别名}：{余额} {币种}", "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"],
           ["balance_volcengine", "火山引擎余额", "{别名}：{余额} {币种}", "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"],
+          ["balance_newapi", "NewAPI 网关余额", "{别名}（{查询范围}）：{余额} {币种}", "支持 {别名}、{余额}、{币种}、{查询范围}；不要使用其他格式表达式。"],
           ["balance_custom", "自定义服务余额", "{别名}：{余额} {币种}", "支持 {别名}、{余额}、{币种}；不要使用其他格式表达式。"],
         ];
         const otherTextKeys = [
@@ -835,6 +836,7 @@
           ["openrouter", "OpenRouter"],
           ["aliyun", "阿里云 BSS"],
           ["volcengine", "火山引擎"],
+          ["newapi", "NewAPI 网关"],
           ["custom_openai", "自定义（OpenAI 来源）"],
           ["custom_anthropic", "自定义（Anthropic 来源）"],
           ["custom", "自定义 HTTP"],
@@ -906,6 +908,70 @@
           const item = catalogByKind.get(kind);
           const settings = item && item.settings && typeof item.settings === "object" ? item.settings : {};
           return JSON.parse(JSON.stringify(settings));
+        }
+
+        function boundProviderBases(record, providers) {
+          const selected = new Set((record.provider_ids || []).map(String));
+          return Array.from(new Set(
+            (providers || [])
+              .filter((provider) => selected.has(String(provider.id)))
+              .map((provider) => String(provider.api_base || "").trim())
+              .filter(Boolean),
+          ));
+        }
+
+        function deriveNewApiBaseFromBalanceUrl(value) {
+          const raw = String(value || "").trim();
+          if (!raw) return "";
+          try {
+            const url = new URL(raw);
+            const path = url.pathname.replace(/\/+$/, "");
+            const suffixes = ["/api/usage/token", "/api/status"];
+            const suffix = suffixes.find((item) => path.toLowerCase().endsWith(item));
+            if (!suffix) return "";
+            const basePath = path.slice(0, -suffix.length).replace(/\/+$/, "");
+            return url.origin + basePath;
+          } catch {
+            return "";
+          }
+        }
+
+        function prepareNewApiSettings(record, previousSettings, providers, defaults) {
+          const previous = previousSettings && typeof previousSettings === "object" ? previousSettings : {};
+          const settings = JSON.parse(JSON.stringify(defaults || {}));
+          settings.api_key = previous.api_key == null ? "" : String(previous.api_key);
+
+          const existingBase = String(previous.base_url || "").trim();
+          const providerBases = boundProviderBases(record, providers);
+          if (existingBase) {
+            settings.base_url = existingBase;
+          } else if (providerBases.length === 1) {
+            settings.base_url = providerBases[0];
+          } else if (providerBases.length === 0) {
+            settings.base_url = deriveNewApiBaseFromBalanceUrl(previous.url);
+          }
+
+          const providerIds = (record.provider_ids || []).map(String);
+          if (!record.credential_ref && providerIds.length === 1) {
+            record.credential_ref = providerIds[0];
+          }
+          return settings;
+        }
+
+        function fillNewApiSettingsFromBindings(record, providers) {
+          if (record.kind !== "newapi") return;
+          const providerBases = boundProviderBases(record, providers);
+          if (!String(record.settings.base_url || "").trim()) {
+            if (providerBases.length === 1) {
+              record.settings.base_url = providerBases[0];
+            } else if (providerBases.length === 0) {
+              record.settings.base_url = deriveNewApiBaseFromBalanceUrl(record.settings.url);
+            }
+          }
+          const providerIds = (record.provider_ids || []).map(String);
+          if (!record.credential_ref && providerIds.length === 1) {
+            record.credential_ref = providerIds[0];
+          }
         }
 
         function normalizedConfigFromResponse(response) {
@@ -1126,7 +1192,7 @@
               }
               return value == null || (typeof value === "string" && !value.trim());
             });
-            const customKinds = ["custom", "custom_openai", "custom_anthropic"];
+            const customKinds = ["newapi", "custom", "custom_openai", "custom_anthropic"];
             if (
               customKinds.includes(record.kind) &&
               record.settings.auth_mode !== "none" &&
@@ -1193,7 +1259,9 @@
                 if (checkbox.checked) selected.add(id);
                 else selected.delete(id);
                 record.provider_ids = Array.from(selected);
+                fillNewApiSettingsFromBindings(record, astrbotProviders);
                 markManual(record);
+                renderBalanceRecords();
               });
               const text = document.createElement("span");
               text.textContent = providerDisplay(provider);
@@ -1204,12 +1272,15 @@
           const helper = document.createElement("p");
           helper.className = "field-help";
           helper.textContent = "可多选。这里只保存 Provider ID，不读取或显示模型 Key。";
+          if (record.kind === "newapi" && boundProviderBases(record, astrbotProviders).length > 1) {
+            helper.textContent += " 多个绑定供应商使用不同 API 地址，请确认填写的 NewAPI 网关地址对应目标站点。";
+          }
           wrapper.append(label, list, helper);
           parent.append(wrapper);
         }
 
         function supportsCredentialReference(kind) {
-          return ["deepseek", "kimi", "custom", "custom_openai", "custom_anthropic"].includes(kind);
+          return ["deepseek", "kimi", "newapi", "custom", "custom_openai", "custom_anthropic"].includes(kind);
         }
 
         function renderCredentialReference(record, parent) {
@@ -1287,10 +1358,12 @@
               });
             } else if (type === "select") {
               control = document.createElement("select");
-              (Array.isArray(definition.options) ? definition.options : []).forEach((value) => {
+              (Array.isArray(definition.options) ? definition.options : []).forEach((value, index) => {
                 const option = document.createElement("option");
                 option.value = String(value);
-                option.textContent = String(value);
+                option.textContent = Array.isArray(definition.labels) && definition.labels[index]
+                  ? String(definition.labels[index])
+                  : String(value);
                 control.append(option);
               });
               control.value = String(record.settings[key] == null ? definition.default || "" : record.settings[key]);
@@ -1401,8 +1474,11 @@
             kindSelect.value = record.kind;
             kindSelect.disabled = !catalog.length;
             kindSelect.addEventListener("change", () => {
+              const previousSettings = record.settings;
               record.kind = kindSelect.value;
-              record.settings = defaultSettingsFor(record.kind);
+              record.settings = record.kind === "newapi"
+                ? prepareNewApiSettings(record, previousSettings, astrbotProviders, defaultSettingsFor(record.kind))
+                : defaultSettingsFor(record.kind);
               if (!supportsCredentialReference(record.kind)) record.credential_ref = "";
               record.scan_status = "needs_configuration";
               record.scan_note = "";
