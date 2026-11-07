@@ -96,6 +96,104 @@
       }
     }
   },
+  "music_integration": {
+    "description": "Better Music 点歌额度联动",
+    "type": "object",
+    "default": {
+      "enabled": false,
+      "independent_quota": false,
+      "multiplier": 1,
+      "default_user_limit": 70,
+      "default_group_limit": 200,
+      "user_group_limits": [],
+      "group_rules": []
+    },
+    "items": {
+      "enabled": {
+        "description": "启用音乐额度联动",
+        "type": "bool",
+        "default": false
+      },
+      "independent_quota": {
+        "description": "使用独立点歌额度",
+        "type": "bool",
+        "default": false
+      },
+      "multiplier": {
+        "description": "共享聊天额度扣除倍数",
+        "type": "int",
+        "default": 1,
+        "hint": "仅共享聊天额度模式使用，必须为正整数。"
+      },
+      "default_user_limit": {
+        "description": "默认私聊每日点歌额度",
+        "type": "int",
+        "default": 70,
+        "hint": "-1 禁止点歌；0 不限额；正整数表示每日次数。"
+      },
+      "default_group_limit": {
+        "description": "默认群聊每日点歌额度",
+        "type": "int",
+        "default": 200,
+        "hint": "-1 禁止点歌；0 不限额；正整数表示每日次数。"
+      },
+      "user_group_limits": {
+        "description": "用户组点歌额度",
+        "type": "template_list",
+        "default": [],
+        "hint": "为已有用户组设置点歌额度；用户组归属沿用上方 user_groups。",
+        "templates": {
+          "user_group_limit": {
+            "name": "用户组点歌额度",
+            "hint": "每个用户组最多配置一条音乐额度规则。",
+            "display_item": "user_group_id",
+            "items": {
+              "user_group_id": {
+                "description": "用户组标识",
+                "type": "string",
+                "default": "",
+                "hint": "填写上方用户组中的 id。"
+              },
+              "daily_limit": {
+                "description": "每日点歌额度",
+                "type": "int",
+                "default": 70,
+                "hint": "-1 禁止点歌；0 不限额；正整数表示每日次数。"
+              }
+            }
+          }
+        }
+      },
+      "group_rules": {
+        "description": "群聊点歌额度规则",
+        "type": "template_list",
+        "default": [],
+        "hint": "为指定群设置每日共享点歌额度；未列出的群使用默认值。",
+        "templates": {
+          "music_group_rule": {
+            "name": "点歌群规则",
+            "hint": "每个群最多配置一条点歌额度规则。",
+            "display_item": "group_id",
+            "items": {
+              "group_id": {
+                "description": "群号",
+                "type": "string",
+                "default": "",
+                "hint": "填写纯数字 QQ 群号。"
+              },
+              "daily_limit": {
+                "description": "每日点歌额度",
+                "type": "int",
+                "default": 200,
+                "hint": "-1 禁止点歌；0 不限额；正整数表示每日次数。"
+              }
+            }
+          }
+        }
+      }
+    },
+    "hint": "每日重置时间沿用插件的北京时间设置。额度与聊天配额共享或独立，音乐用量单独记录。"
+  },
   "text_settings": {
     "description": "命令和余额查询回复文本",
     "type": "object",
@@ -106,6 +204,10 @@
       "group_unlimited_reply": "本群今日已用 {used} 次，群额度不限。",
       "blacklist_reply": "当前会话已被禁止聊天，请联系管理员。",
       "exhausted_reply": "今日配额已用尽，请在下次重置后再试。",
+      "music_quota_exhausted": "今日点歌额度已用尽：已用 {used}/{total}，剩余 {remaining}。",
+      "music_shared_exhausted": "本次点歌需要 {cost} 个聊天额度（倍率 {multiplier}），当前剩余 {remaining}。",
+      "music_blacklist": "当前会话已被禁止点歌。",
+      "music_unavailable": "音乐额度联动暂不可用，请稍后再试。",
       "balance_deepseek": "{别名}：{余额} {币种}（赠送 {赠送余额}，充值 {充值余额}）",
       "balance_kimi": "{别名}：{余额} {币种}（代金券 {代金券余额}，现金 {现金余额}）",
       "balance_openrouter": "{别名}：{余额} {币种}",
@@ -159,6 +261,30 @@
         "type": "text",
         "default": "今日配额已用尽，请在下次重置后再试。",
         "hint": "支持 {used} 和 {total}；不要使用其他格式表达式。"
+      },
+      "music_quota_exhausted": {
+        "description": "点歌独立额度耗尽回复",
+        "type": "text",
+        "default": "今日点歌额度已用尽：已用 {used}/{total}，剩余 {remaining}。",
+        "hint": "支持 {used}、{total}、{remaining}、{cost} 和 {multiplier}；不要使用其他格式表达式。"
+      },
+      "music_shared_exhausted": {
+        "description": "点歌共享额度不足回复",
+        "type": "text",
+        "default": "本次点歌需要 {cost} 个聊天额度（倍率 {multiplier}），当前剩余 {remaining}。",
+        "hint": "支持 {used}、{total}、{remaining}、{cost} 和 {multiplier}；不要使用其他格式表达式。"
+      },
+      "music_blacklist": {
+        "description": "禁止点歌回复",
+        "type": "text",
+        "default": "当前会话已被禁止点歌。",
+        "hint": "支持 {used}、{total}、{remaining}、{cost} 和 {multiplier}；不要使用其他格式表达式。"
+      },
+      "music_unavailable": {
+        "description": "音乐联动不可用回复",
+        "type": "text",
+        "default": "音乐额度联动暂不可用，请稍后再试。",
+        "hint": "支持 {used}、{total}、{remaining}、{cost} 和 {multiplier}；不要使用其他格式表达式。"
       },
       "balance_deepseek": {
         "description": "DeepSeek 余额回复",

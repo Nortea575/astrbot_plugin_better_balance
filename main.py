@@ -13,6 +13,7 @@ from astrbot.api.star import Context, Star, StarTools, register
 from .balance import BalanceService
 from .compat import QuotaCompatibility
 from .configuration import TEXT_DEFAULTS
+from .music_integration import MusicIntegration
 from .quota import Store
 from .usage import UsageService
 from .web import WebAPI
@@ -37,7 +38,7 @@ def _render_template(template: object, values: dict) -> str:
     "astrbot_plugin_better_balance",
     "Xing",
     "每日聊天配额与模型供应商余额管理插件",
-    "0.5.0",
+    "1.0.0",
 )
 class BetterBalancePlugin(Star):
     """Manage chat quotas and query provider balances without an LLM call."""
@@ -48,16 +49,48 @@ class BetterBalancePlugin(Star):
         self.compat = QuotaCompatibility(self.store)
         self.balance_service = BalanceService(context, self.store)
         self.usage_service = UsageService(context)
+        self.music_integration = MusicIntegration(self.store)
         self.web = WebAPI(
             context,
             self.store,
             compatibility_status=self.compat.status,
             balance_service=self.balance_service,
+            music_integration=self.music_integration,
         )
         self.web.register()
         self.compat.install()
         self._scan_balance_on_loaded = not self._providers_available(context)
         self._scan_local_balance_providers()
+        self._connect_music()
+
+    def _connect_music(self) -> None:
+        """Discover Music once per plugin startup or AstrBot loaded event."""
+        getter = getattr(self.context, "get_registered_star", None)
+        if not callable(getter):
+            return
+        try:
+            metadata = getter("astrbot_plugin_better_music")
+        except Exception:
+            return
+        plugin = getattr(metadata, "star_cls", None)
+        if plugin is None:
+            return
+        api_getter = getattr(plugin, "get_music_quota_api", None)
+        api = (
+            api_getter()
+            if callable(api_getter)
+            else getattr(plugin, "music_quota", None)
+        )
+        if api is not None:
+            self.on_music_quota_ready(api)
+
+    def on_music_quota_ready(self, api) -> None:
+        """Public lifecycle hook used by Better Music's quota API v2."""
+        self.music_integration.on_music_quota_ready(api)
+
+    def on_music_quota_unavailable(self, api) -> None:
+        """Public lifecycle hook for disconnecting one Music API instance."""
+        self.music_integration.on_music_quota_unavailable(api)
 
     @staticmethod
     def _providers_available(context) -> bool:
@@ -180,6 +213,7 @@ class BetterBalancePlugin(Star):
     async def install_runtime_adapters(self) -> None:
         """Install adapters and retry the local scan once providers are ready."""
         self.compat.install()
+        self._connect_music()
         if self._scan_balance_on_loaded:
             self._scan_local_balance_providers()
             self._scan_balance_on_loaded = False
@@ -329,6 +363,7 @@ class BetterBalancePlugin(Star):
 
     async def terminate(self) -> None:
         """Restore runtime wrappers and close the plugin's local resources."""
+        self.music_integration.close()
         self.compat.close()
         close_web = getattr(self.web, "close", None)
         if callable(close_web):

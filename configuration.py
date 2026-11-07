@@ -7,7 +7,6 @@ import re
 import uuid
 from collections.abc import Mapping
 
-
 TEXT_DEFAULTS = {
     "quota_reply": "今日已用 {used} 次，总配额 {total} 次。",
     "unlimited_reply": "今日已用 {used} 次，个人额度不限。",
@@ -15,6 +14,10 @@ TEXT_DEFAULTS = {
     "group_unlimited_reply": "本群今日已用 {used} 次，群额度不限。",
     "blacklist_reply": "当前会话已被禁止聊天，请联系管理员。",
     "exhausted_reply": "今日配额已用尽，请在下次重置后再试。",
+    "music_quota_exhausted": "今日点歌额度已用尽：已用 {used}/{total}，剩余 {remaining}。",
+    "music_shared_exhausted": "本次点歌需要 {cost} 个聊天额度（倍率 {multiplier}），当前剩余 {remaining}。",
+    "music_blacklist": "当前会话已被禁止点歌。",
+    "music_unavailable": "音乐额度联动暂不可用，请稍后再试。",
     "balance_deepseek": "{别名}：{余额} {币种}（赠送 {赠送余额}，充值 {充值余额}）",
     "balance_kimi": "{别名}：{余额} {币种}（代金券 {代金券余额}，现金 {现金余额}）",
     "balance_openrouter": "{别名}：{余额} {币种}",
@@ -41,6 +44,15 @@ DEFAULT_CONFIG = {
     "default_group_limit": 200,
     "user_groups": [],
     "group_rules": [],
+    "music_integration": {
+        "enabled": False,
+        "independent_quota": False,
+        "multiplier": 1,
+        "default_user_limit": 70,
+        "default_group_limit": 200,
+        "user_group_limits": [],
+        "group_rules": [],
+    },
     "balance_providers": [],
     "text_settings": TEXT_DEFAULTS,
 }
@@ -68,6 +80,10 @@ _TEMPLATE_FIELDS = {
     "group_unlimited_reply": {"used", "total"},
     "blacklist_reply": {"used", "total"},
     "exhausted_reply": {"used", "total"},
+    "music_quota_exhausted": {"used", "total", "remaining", "cost", "multiplier"},
+    "music_shared_exhausted": {"used", "total", "remaining", "cost", "multiplier"},
+    "music_blacklist": {"used", "total", "remaining", "cost", "multiplier"},
+    "music_unavailable": {"used", "total", "remaining", "cost", "multiplier"},
     "balance_deepseek": {"别名", "余额", "币种", "赠送余额", "充值余额"},
     "balance_kimi": {"别名", "余额", "币种", "代金券余额", "现金余额"},
     "balance_openrouter": {"别名", "余额", "币种"},
@@ -164,6 +180,7 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
         "default_group_limit",
         "user_groups",
         "group_rules",
+        "music_integration",
         *LEGACY_TEXT_KEYS,
     }
     unknown = set(payload) - allowed_keys
@@ -173,11 +190,21 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
     raw = copy.deepcopy(default_config())
     raw.update(copy.deepcopy(dict(base)))
     raw["text_settings"] = migrate_text_settings(raw)
+    if "music_integration" in payload:
+        music_payload = payload["music_integration"]
+        if not isinstance(music_payload, Mapping):
+            raise ValueError("music_integration 必须是对象")
+        merged_music = copy.deepcopy(
+            raw.get("music_integration", DEFAULT_CONFIG["music_integration"])
+        )
+        merged_music.update(copy.deepcopy(dict(music_payload)))
+        raw["music_integration"] = merged_music
     raw.update(
         {
             key: copy.deepcopy(value)
             for key, value in payload.items()
-            if key not in ALL_LEGACY_TEXT_KEYS and key != "text_settings"
+            if key not in ALL_LEGACY_TEXT_KEYS
+            and key not in {"text_settings", "music_integration"}
         }
     )
     nested_update = payload.get("text_settings")
@@ -309,6 +336,103 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
         rule_ids.add(group_id)
         group_rules.append({"group_id": group_id, "daily_limit": daily_limit})
 
+    music_raw = raw.get("music_integration")
+    music_keys = {
+        "enabled",
+        "independent_quota",
+        "multiplier",
+        "default_user_limit",
+        "default_group_limit",
+        "user_group_limits",
+        "group_rules",
+    }
+    if not isinstance(music_raw, Mapping) or set(music_raw) - music_keys:
+        raise ValueError("music_integration 配置字段无效")
+    music = copy.deepcopy(DEFAULT_CONFIG["music_integration"])
+    music.update(copy.deepcopy(dict(music_raw)))
+    for key in ("enabled", "independent_quota"):
+        if not isinstance(music.get(key), bool):
+            raise ValueError(f"music_integration.{key} 必须是布尔值")
+    multiplier = music.get("multiplier")
+    if (
+        isinstance(multiplier, bool)
+        or not isinstance(multiplier, int)
+        or multiplier < 1
+    ):
+        raise ValueError("music_integration.multiplier 必须是正整数")
+    music_limits = {}
+    for key in ("default_user_limit", "default_group_limit"):
+        value = music.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < -1:
+            raise ValueError(f"music_integration.{key} 必须是 -1、0 或正整数")
+        music_limits[key] = value
+
+    user_group_limits_raw = music.get("user_group_limits")
+    if not isinstance(user_group_limits_raw, list):
+        raise ValueError("music_integration.user_group_limits 必须是数组")
+    known_user_group_ids = {item["id"] for item in user_groups}
+    user_group_limits = []
+    configured_user_groups = set()
+    for index, item in enumerate(user_group_limits_raw):
+        label = f"music_integration.user_group_limits[{index}]"
+        if not isinstance(item, Mapping) or set(item) != {
+            "user_group_id",
+            "daily_limit",
+        }:
+            raise ValueError(f"{label} 必须包含 user_group_id、daily_limit")
+        user_group_id = item.get("user_group_id")
+        daily_limit = item.get("daily_limit")
+        if (
+            not isinstance(user_group_id, str)
+            or user_group_id not in known_user_group_ids
+        ):
+            raise ValueError(f"{label}.user_group_id 必须引用已有用户组")
+        if user_group_id in configured_user_groups:
+            raise ValueError(
+                "music_integration.user_group_limits 的 user_group_id 必须唯一"
+            )
+        if (
+            isinstance(daily_limit, bool)
+            or not isinstance(daily_limit, int)
+            or daily_limit < -1
+        ):
+            raise ValueError(f"{label}.daily_limit 必须是 -1、0 或正整数")
+        configured_user_groups.add(user_group_id)
+        user_group_limits.append(
+            {"user_group_id": user_group_id, "daily_limit": daily_limit}
+        )
+
+    music_group_rules_raw = music.get("group_rules")
+    if not isinstance(music_group_rules_raw, list):
+        raise ValueError("music_integration.group_rules 必须是数组")
+    music_group_rules = []
+    music_rule_ids = set()
+    for index, item in enumerate(music_group_rules_raw):
+        label = f"music_integration.group_rules[{index}]"
+        if not isinstance(item, Mapping) or set(item) != {"group_id", "daily_limit"}:
+            raise ValueError(f"{label} 必须包含 group_id、daily_limit")
+        group_id = item.get("group_id")
+        group_id = group_id.strip() if isinstance(group_id, str) else ""
+        daily_limit = item.get("daily_limit")
+        if not _QQ_RE.fullmatch(group_id):
+            raise ValueError(f"{label}.group_id 必须是 QQ 数字字符串")
+        if group_id in music_rule_ids:
+            raise ValueError("music_integration.group_rules 的 group_id 必须唯一")
+        if (
+            isinstance(daily_limit, bool)
+            or not isinstance(daily_limit, int)
+            or daily_limit < -1
+        ):
+            raise ValueError(f"{label}.daily_limit 必须是 -1、0 或正整数")
+        music_rule_ids.add(group_id)
+        music_group_rules.append({"group_id": group_id, "daily_limit": daily_limit})
+    music = {
+        **{key: music[key] for key in ("enabled", "independent_quota", "multiplier")},
+        **music_limits,
+        "user_group_limits": user_group_limits,
+        "group_rules": music_group_rules,
+    }
+
     text_raw = raw.get("text_settings")
     if not isinstance(text_raw, Mapping):
         raise ValueError("text_settings 必须是对象")
@@ -324,6 +448,7 @@ def normalize_config(payload: object, base: Mapping[str, object]) -> dict:
         **limits,
         "user_groups": user_groups,
         "group_rules": group_rules,
+        "music_integration": music,
         "balance_providers": _normalize_balance_providers(
             raw.get("balance_providers", [])
         ),

@@ -1,13 +1,13 @@
 {
   "metadata": {
     "display_name": "更好的额度管理",
-    "short_desc": "每日聊天配额与模型供应商余额管理插件",
-    "desc": "每日聊天配额与模型供应商余额管理插件"
+    "short_desc": "管理聊天配额、供应商余额与点歌额度联动",
+    "desc": "每日聊天配额、模型供应商余额、Token 用量和可选点歌额度联动管理插件"
   },
   "views": {
     "management": {
       "title": "更好的额度管理",
-      "description": "管理每日配额、余额供应商和回复文本。"
+      "description": "管理每日配额、余额供应商、回复文本和点歌联动。"
     }
   },
   "config": {
@@ -76,8 +76,72 @@
         }
       }
     },
+    "music_integration": {
+      "description": "Better Music 点歌额度联动",
+      "hint": "默认关闭。点歌额度共享或独立；每日重置时间沿用北京时间设置。",
+      "items": {
+        "enabled": {
+          "description": "启用 better_music 配额"
+        },
+        "independent_quota": {
+          "description": "使用独立点歌额度"
+        },
+        "multiplier": {
+          "description": "共享聊天额度扣除倍数",
+          "hint": "仅共享额度模式使用，必须为大于等于 1 的整数。"
+        },
+        "default_user_limit": {
+          "description": "默认私聊每日点歌额度",
+          "hint": "-1 禁止点歌；0 不限额；正整数表示每日次数。"
+        },
+        "default_group_limit": {
+          "description": "默认群聊每日点歌额度",
+          "hint": "群内共享。-1 禁止点歌；0 不限额；正整数表示每日次数。"
+        },
+        "user_group_limits": {
+          "description": "用户组点歌额度",
+          "hint": "按上方现有用户组覆盖私聊点歌额度；留空的额度继承默认值。",
+          "templates": {
+            "user_group_limit": {
+              "name": "用户组点歌额度",
+              "hint": "通过现有用户组标识关联聊天额度管理中的成员归属。",
+              "items": {
+                "user_group_id": {
+                  "description": "用户组标识",
+                  "hint": "选择或填写已存在的用户组 ID。"
+                },
+                "daily_limit": {
+                  "description": "每日点歌配额",
+                  "hint": "-1 禁止点歌；0 不限额；正整数表示每日次数。"
+                }
+              }
+            }
+          }
+        },
+        "group_rules": {
+          "description": "群聊点歌额度规则",
+          "hint": "为 QQ 群设置共享额度；未设置的群使用默认群聊点歌额度。",
+          "templates": {
+            "music_group_rule": {
+              "name": "点歌群规则",
+              "hint": "一条规则对应一个 QQ 群。",
+              "items": {
+                "group_id": {
+                  "description": "QQ 群号",
+                  "hint": "填写纯数字群号；每个群只能配置一条规则。"
+                },
+                "daily_limit": {
+                  "description": "每日点歌配额",
+                  "hint": "-1 禁止点歌；0 不限额；正整数表示每日次数。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "text_settings": {
-      "description": "命令和余额查询回复文本",
+      "description": "聊天配额、余额查询、Token 用量、命令帮助和点歌联动回复文本",
       "hint": "图形化管理页与此对象共用配置。占位符仅支持字段提示中列出的名称，不支持任意格式表达式。",
       "items": {
         "quota_reply": {
@@ -163,6 +227,22 @@
         "help_reply": {
           "description": "帮助回复",
           "hint": "支持 {命令列表}；不要使用其他格式表达式。"
+        },
+        "music_quota_exhausted": {
+          "description": "点歌额度耗尽",
+          "hint": "支持 {used}、{total}、{remaining}、{cost}、{multiplier}；不要使用其他格式表达式。"
+        },
+        "music_shared_exhausted": {
+          "description": "共享聊天额度不足",
+          "hint": "支持 {used}、{total}、{remaining}、{cost}、{multiplier}；不要使用其他格式表达式。"
+        },
+        "music_blacklist": {
+          "description": "禁止点歌",
+          "hint": "支持 {used}、{total}、{remaining}、{cost}、{multiplier}；默认文本不使用占位符。"
+        },
+        "music_unavailable": {
+          "description": "联动不可用",
+          "hint": "支持 {used}、{total}、{remaining}、{cost}、{multiplier}；默认文本不使用占位符。"
         }
       }
     },

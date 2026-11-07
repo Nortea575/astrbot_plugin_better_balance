@@ -1,7 +1,7 @@
 name: astrbot_plugin_better_balance
 display_name: 更好的额度管理
-desc: 每日聊天配额与模型供应商余额管理插件
-version: 0.5.0
+desc: 每日聊天配额、余额查询与点歌额度联动管理插件
+version: 1.0.0
 author: Xing
 repo: https://github.com/Nortea575/astrbot_plugin_better_balance
 support_platforms:

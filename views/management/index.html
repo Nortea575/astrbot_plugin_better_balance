@@ -175,12 +175,16 @@
 
       .section-tabs {
         display: flex;
+        overflow-x: auto;
         gap: 4px;
         margin-bottom: 16px;
         border-bottom: 1px solid var(--border);
+        scrollbar-color: var(--muted) var(--surface-soft);
+        scrollbar-width: thin;
       }
 
       .tab {
+        flex: 0 0 auto;
         min-height: 42px;
         padding: 8px 15px;
         border: 0;
@@ -272,6 +276,8 @@
         overflow-x: auto;
         border: 1px solid var(--border);
         border-radius: 8px;
+        scrollbar-color: var(--muted) var(--surface-soft);
+        scrollbar-width: thin;
       }
 
       table {
@@ -285,7 +291,96 @@
       }
 
       .usage-table {
-        min-width: 900px;
+        min-width: 920px;
+      }
+
+      .usage-table-wrap {
+        padding: 8px;
+      }
+
+      .usage-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 0 0 10px;
+      }
+
+      .usage-tabs {
+        display: inline-flex;
+        gap: 2px;
+        padding: 3px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: var(--surface-soft);
+      }
+
+      .usage-tab {
+        min-height: 34px;
+        padding: 6px 12px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .usage-tab[aria-selected="true"] {
+        background: var(--surface);
+        color: var(--text);
+        font-weight: 620;
+        box-shadow: var(--shadow);
+      }
+
+      .usage-sort {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 24px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+      }
+
+      .usage-sort::after {
+        width: 0;
+        height: 0;
+        border-right: 4px solid transparent;
+        border-bottom: 5px solid currentColor;
+        border-left: 4px solid transparent;
+        content: "";
+        opacity: 0.3;
+      }
+
+      th[aria-sort="ascending"] .usage-sort::after {
+        border-bottom-color: var(--accent);
+        opacity: 1;
+      }
+
+      th[aria-sort="descending"] .usage-sort::after {
+        border-top: 5px solid var(--accent);
+        border-bottom: 0;
+        opacity: 1;
+      }
+
+      .usage-table .usage-platform,
+      .usage-table .usage-target,
+      .usage-table .usage-count {
+        white-space: nowrap;
+      }
+
+      .usage-table .usage-target,
+      .usage-table .usage-count {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .usage-table .usage-name {
+        min-width: 150px;
+        max-width: 290px;
+        overflow-wrap: anywhere;
       }
 
       th,
@@ -325,6 +420,83 @@
 
       .template-grid .field {
         align-content: start;
+      }
+
+      .text-category-tabs {
+        display: flex;
+        overflow-x: auto;
+        gap: 4px;
+        padding-bottom: 2px;
+        scrollbar-color: var(--muted) var(--surface-soft);
+        scrollbar-width: thin;
+      }
+
+      .text-category-tab {
+        min-height: 36px;
+        padding: 7px 12px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--surface);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .text-category-tab[aria-selected="true"] {
+        border-color: var(--accent);
+        color: var(--text);
+        font-weight: 620;
+      }
+
+      .check-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .check-row input {
+        flex: 0 0 auto;
+        width: 18px;
+        height: 18px;
+        margin: 2px 0 0;
+        accent-color: var(--accent);
+      }
+
+      .check-row span {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .music-controls {
+        display: grid;
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .music-subsection {
+        display: grid;
+        gap: 14px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+
+      .music-subsection .table-wrap {
+        padding: 8px;
+      }
+
+      .music-subsection h3 {
+        margin: 0;
+      }
+
+      .music-subsection .hint {
+        margin: -8px 0 0;
+      }
+
+      .table-select {
+        min-height: 38px;
+        padding: 7px 9px;
+        color: var(--text);
       }
 
       .template-grid textarea {
@@ -561,11 +733,10 @@
         }
 
         .section-tabs {
-          justify-content: space-between;
+          justify-content: flex-start;
         }
 
         .tab {
-          flex: 1;
           padding-right: 8px;
           padding-left: 8px;
         }
@@ -584,6 +755,11 @@
           align-self: flex-start;
         }
 
+        .usage-controls {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
         .save-row {
           align-items: stretch;
           flex-direction: column;
@@ -596,7 +772,7 @@
       <header class="page-header">
         <div>
           <h1>额度与余额管理</h1>
-          <p class="description">管理每日配额、余额供应商和查询文本；原生插件设置与本页共用一份配置。</p>
+          <p class="description">管理每日配额、余额供应商、回复文本和点歌联动；原生插件设置与本页共用一份配置。</p>
         </div>
         <div class="header-actions">
           <button class="button" id="reload-config" type="button" title="从 AstrBot 读取已保存的配置；会覆盖本页尚未保存的编辑">重新读取设置</button>
@@ -605,9 +781,10 @@
       </header>
 
       <nav class="section-tabs" role="tablist" aria-label="插件管理板块">
-        <button class="tab" id="tab-quota" type="button" role="tab" aria-controls="panel-quota" aria-selected="true">配额管理</button>
-        <button class="tab" id="tab-balance" type="button" role="tab" aria-controls="panel-balance" aria-selected="false">余额管理</button>
-        <button class="tab" id="tab-text" type="button" role="tab" aria-controls="panel-text" aria-selected="false">文本设置</button>
+        <button class="tab" id="tab-quota" type="button" role="tab" aria-controls="panel-quota" aria-selected="true" tabindex="0">配额管理</button>
+        <button class="tab" id="tab-balance" type="button" role="tab" aria-controls="panel-balance" aria-selected="false" tabindex="-1">余额管理</button>
+        <button class="tab" id="tab-text" type="button" role="tab" aria-controls="panel-text" aria-selected="false" tabindex="-1">文本设置</button>
+        <button class="tab" id="tab-music" type="button" role="tab" aria-controls="panel-music" aria-selected="false" tabindex="-1">联动管理</button>
       </nav>
 
       <section id="panel-quota" class="panel-stack" role="tabpanel" aria-labelledby="tab-quota">
@@ -688,22 +865,28 @@
           <div class="card-heading">
             <div>
               <h2>今日用量</h2>
-              <p class="hint">按平台、会话类型和目标查看当前周期用量及下次重置时间。</p>
+              <p class="hint">按私聊或群聊查看当前周期用量；可按已用、总额或剩余排序。</p>
             </div>
             <button class="button" id="refresh-usage-card" type="button">刷新</button>
           </div>
-          <div class="table-wrap">
+          <div class="usage-controls">
+            <div class="usage-tabs" role="tablist" aria-label="今日用量会话类型">
+              <button class="usage-tab" id="usage-tab-private" type="button" role="tab" aria-controls="usage-panel" aria-selected="true" tabindex="0" data-usage-kind="private">私聊</button>
+              <button class="usage-tab" id="usage-tab-group" type="button" role="tab" aria-controls="usage-panel" aria-selected="false" tabindex="-1" data-usage-kind="group">群聊</button>
+            </div>
+          </div>
+          <div class="table-wrap usage-table-wrap" id="usage-panel" role="tabpanel" aria-labelledby="usage-tab-private" tabindex="0">
             <table class="usage-table">
               <thead>
                 <tr>
                   <th scope="col">范围</th>
-                  <th scope="col">类型</th>
                   <th scope="col">目标</th>
+                  <th scope="col">名称</th>
                   <th scope="col">周期</th>
-                  <th scope="col">已用</th>
-                  <th scope="col">总额</th>
+                  <th scope="col" id="usage-sort-header-used" aria-sort="descending"><button class="usage-sort" type="button" data-usage-sort="used">已用</button></th>
+                  <th scope="col" id="usage-sort-header-total" aria-sort="none"><button class="usage-sort" type="button" data-usage-sort="total">总额</button></th>
                   <th scope="col">预留</th>
-                  <th scope="col">剩余</th>
+                  <th scope="col" id="usage-sort-header-remaining" aria-sort="none"><button class="usage-sort" type="button" data-usage-sort="remaining">剩余</button></th>
                   <th scope="col">下次重置（北京时间）</th>
                 </tr>
               </thead>
@@ -771,6 +954,137 @@
           <button class="button button-primary save-button" data-save-scope="text" type="button">保存全部设置</button>
         </div>
       </section>
+
+      <section id="panel-music" class="panel-stack" role="tabpanel" aria-labelledby="tab-music" hidden>
+        <div class="card">
+          <div class="card-heading">
+            <div>
+              <h2>点歌额度联动</h2>
+              <p class="hint">连接 Better Music 的点歌配额管理。配置在保存全部设置后生效。</p>
+            </div>
+          </div>
+          <label class="check-row" for="music-integration-enabled">
+            <input id="music-integration-enabled" type="checkbox" />
+            <span>
+              <strong>启用 better_music 配额</strong>
+              <span class="hint">关闭时不为点歌扣减或限制额度；开启后按下方模式计量。</span>
+            </span>
+          </label>
+          <p id="music-integration-status" class="status" role="status" aria-live="polite"></p>
+          <p id="music-mode-hint" class="hint">点歌额度联动当前关闭；保存后不执行点歌额度检查或扣减。</p>
+
+          <div id="music-integration-controls" class="music-controls" hidden>
+            <label class="check-row" for="music-independent-quota">
+              <input id="music-independent-quota" type="checkbox" />
+              <span>
+                <strong>使用独立点歌配额</strong>
+                <span class="hint">开启后点歌使用单独的私聊和群聊配额；关闭时按聊天配额倍数扣额。</span>
+              </span>
+            </label>
+
+            <div id="music-multiplier-field" class="field">
+              <label for="music-multiplier">每次点歌消耗的聊天额度倍数</label>
+              <input id="music-multiplier" type="number" min="1" step="1" inputmode="numeric" value="1" />
+              <p class="field-help">输入大于等于 1 的整数。设置生效后，每次成功点歌按该倍数消耗聊天配额。</p>
+            </div>
+
+            <div id="music-independent-settings" class="music-subsection" hidden>
+              <h3>独立配额规则</h3>
+              <p class="hint">-1 表示禁止点歌，0 表示不限额，正整数表示每日次数。群组额度按 QQ 群共享。</p>
+              <div class="field-grid">
+                <div class="field">
+                  <label for="music-default-user-limit">默认私聊点歌配额（次）</label>
+                  <input id="music-default-user-limit" type="number" min="-1" step="1" inputmode="numeric" value="70" />
+                </div>
+                <div class="field">
+                  <label for="music-default-group-limit">默认群聊点歌配额（次）</label>
+                  <input id="music-default-group-limit" type="number" min="-1" step="1" inputmode="numeric" value="200" />
+                </div>
+              </div>
+
+              <div class="music-subsection">
+                <h3>用户组覆盖</h3>
+                <p class="hint">沿用上方用户组成员归属，按用户组单独覆盖点歌额度。额度留空时继承默认私聊配额。</p>
+                <div class="action-row">
+                  <button class="button" id="add-music-user-group-limit" type="button">添加用户组额度</button>
+                </div>
+                <div class="table-wrap">
+                  <table class="edit-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">用户组</th>
+                        <th scope="col">每日点歌配额</th>
+                        <th scope="col">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="music-user-group-limits"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="music-subsection">
+                <h3>群规则</h3>
+                <p class="hint">为指定 QQ 群设置独立点歌配额；群内成员共享额度，未设置的群使用默认群聊配额。</p>
+                <div class="action-row">
+                  <button class="button" id="add-music-group-rule" type="button">添加群规则</button>
+                </div>
+                <div class="table-wrap">
+                  <table class="edit-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">群号</th>
+                        <th scope="col">每日点歌配额</th>
+                        <th scope="col">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="music-group-rules"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="music-usage-card" class="card" hidden>
+          <div class="card-heading">
+            <div>
+              <h2>点歌今日用量</h2>
+              <p class="hint">独立配额模式下显示当前周期的私聊和群聊用量。</p>
+            </div>
+            <button class="button" id="refresh-music-usage" type="button">刷新</button>
+          </div>
+          <div class="usage-controls">
+            <div class="usage-tabs" role="tablist" aria-label="点歌用量会话类型">
+              <button class="usage-tab" id="music-usage-tab-private" type="button" role="tab" aria-controls="music-usage-panel" aria-selected="true" tabindex="0" data-music-usage-kind="private">私聊</button>
+              <button class="usage-tab" id="music-usage-tab-group" type="button" role="tab" aria-controls="music-usage-panel" aria-selected="false" tabindex="-1" data-music-usage-kind="group">群聊</button>
+            </div>
+          </div>
+          <div class="table-wrap usage-table-wrap" id="music-usage-panel" role="tabpanel" aria-labelledby="music-usage-tab-private" tabindex="0">
+            <table class="usage-table">
+              <thead>
+                <tr>
+                  <th scope="col">范围</th>
+                  <th scope="col">目标</th>
+                  <th scope="col">名称</th>
+                  <th scope="col">周期</th>
+                  <th scope="col" id="music-usage-sort-header-used" aria-sort="descending"><button class="usage-sort" type="button" data-music-usage-sort="used">已用</button></th>
+                  <th scope="col" id="music-usage-sort-header-total" aria-sort="none"><button class="usage-sort" type="button" data-music-usage-sort="total">总额</button></th>
+                  <th scope="col">预留</th>
+                  <th scope="col" id="music-usage-sort-header-remaining" aria-sort="none"><button class="usage-sort" type="button" data-music-usage-sort="remaining">剩余</button></th>
+                  <th scope="col">下次重置（北京时间）</th>
+                </tr>
+              </thead>
+              <tbody id="music-usage-rows"></tbody>
+            </table>
+          </div>
+          <p id="music-usage-status" class="usage-meta" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="save-row">
+          <p id="music-save-status" class="status" role="status" aria-live="polite"></p>
+          <button class="button button-primary save-button" data-save-scope="music" type="button">保存全部设置</button>
+        </div>
+      </section>
     </main>
 
     <script src="/api/plugin/page/bridge-sdk.js"></script>
@@ -787,11 +1101,18 @@
         const userGroupsBody = byId("user-groups");
         const groupRulesBody = byId("group-rules");
         const usageRowsBody = byId("usage-rows");
+        const usageTabButtons = [byId("usage-tab-private"), byId("usage-tab-group")];
+        const usageSortButtons = Array.from(document.querySelectorAll("[data-usage-sort]"));
+        const musicUsageRowsBody = byId("music-usage-rows");
+        const musicUsageTabButtons = [byId("music-usage-tab-private"), byId("music-usage-tab-group")];
+        const musicUsageSortButtons = Array.from(document.querySelectorAll("[data-music-usage-sort]"));
         const balanceRecordsRoot = byId("balance-records");
         const balanceResultsBody = byId("balance-results");
         const textSettingsRoot = byId("text-settings-container");
         const reloadConfigButton = byId("reload-config");
         const saveButtons = Array.from(document.querySelectorAll(".save-button"));
+        const sectionTabButtons = Array.from(document.querySelectorAll(".section-tabs [role=\"tab\"]"));
+        const textCategoryButtons = [];
 
         const quotaTextKeys = [
           ["quota_reply", "私聊有限额回复", "今日已用 {used} 次，总配额 {total} 次。", "支持 {used}（已用次数）和 {total}（每日配额）；不要使用其他格式表达式。"],
@@ -821,15 +1142,31 @@
           ["usage_failure", "Token 用量失败", "暂时无法读取全局 Token 用量。", "此文本不接受占位符。"],
           ["help_reply", "帮助回复", "{命令列表}", "支持 {命令列表}；不要使用其他格式表达式。"],
         ];
+        const musicTextKeys = [
+          ["music_quota_exhausted", "点歌额度耗尽", "今日点歌额度已用尽：已用 {used}/{total}，剩余 {remaining}。", "可用 {used}、{total}、{remaining}、{cost}、{multiplier}；不要使用其他格式表达式。"],
+          ["music_shared_exhausted", "共享聊天额度不足", "本次点歌需要 {cost} 个聊天额度（倍率 {multiplier}），当前剩余 {remaining}。", "可用 {used}、{total}、{remaining}、{cost}、{multiplier}；不要使用其他格式表达式。"],
+          ["music_blacklist", "禁止点歌", "当前会话已被禁止点歌。", "可用 {used}、{total}、{remaining}、{cost}、{multiplier}；默认文案不使用占位符。"],
+          ["music_unavailable", "联动不可用", "音乐额度联动暂不可用，请稍后再试。", "可用 {used}、{total}、{remaining}、{cost}、{multiplier}；默认文案不使用占位符。"],
+        ];
         const defaultTextSettings = Object.fromEntries(
-          [...quotaTextKeys, ...balanceTextKeys, ...otherTextKeys].map(([key, , value]) => [key, value]),
+          [...quotaTextKeys, ...balanceTextKeys, ...otherTextKeys, ...musicTextKeys].map(([key, , value]) => [key, value]),
         );
         const textSections = [
-          { title: "配额回复", fields: quotaTextKeys },
-          { title: "余额回复模板", fields: balanceTextKeys },
-          { title: "失败与状态回复", fields: otherTextKeys.slice(0, 5) },
-          { title: "Token 用量与帮助", fields: otherTextKeys.slice(5) },
+          { id: "quota", title: "聊天配额", fields: quotaTextKeys },
+          { id: "balance", title: "余额查询", fields: [...balanceTextKeys, ...otherTextKeys.slice(0, 5)] },
+          { id: "usage", title: "Token 用量", fields: otherTextKeys.slice(6, 8) },
+          { id: "commands", title: "命令与帮助", fields: [otherTextKeys[5], otherTextKeys[8]] },
+          { id: "music", title: "联动点歌", fields: musicTextKeys },
         ];
+        const defaultMusicIntegration = {
+          enabled: false,
+          independent_quota: false,
+          multiplier: 1,
+          default_user_limit: 70,
+          default_group_limit: 200,
+          user_group_limits: [],
+          group_rules: [],
+        };
         const fallbackKinds = [
           ["deepseek", "DeepSeek"],
           ["kimi", "Kimi（月之暗面）"],
@@ -848,6 +1185,20 @@
         let astrbotProviders = [];
         let balanceResults = [];
         let balanceDirty = false;
+        let usageRecords = [];
+        let activeUsageKind = "private";
+        let musicUsageRecords = [];
+        let activeMusicUsageKind = "private";
+        let activeTextCategory = "quota";
+        let musicValidationTarget = null;
+        const usageSorts = {
+          private: { key: "used", direction: "desc" },
+          group: { key: "used", direction: "desc" },
+        };
+        const musicUsageSorts = {
+          private: { key: "used", direction: "desc" },
+          group: { key: "used", direction: "desc" },
+        };
 
         function setStatus(element, message, tone) {
           element.textContent = message || "";
@@ -982,6 +1333,16 @@
           next.user_groups = Array.isArray(next.user_groups) ? next.user_groups : [];
           next.group_rules = Array.isArray(next.group_rules) ? next.group_rules : [];
           next.balance_providers = Array.isArray(next.balance_providers) ? next.balance_providers : [];
+          const musicIntegration =
+            next.music_integration && typeof next.music_integration === "object" && !Array.isArray(next.music_integration)
+              ? next.music_integration
+              : {};
+          next.music_integration = {
+            ...defaultMusicIntegration,
+            ...musicIntegration,
+            user_group_limits: Array.isArray(musicIntegration.user_group_limits) ? musicIntegration.user_group_limits : [],
+            group_rules: Array.isArray(musicIntegration.group_rules) ? musicIntegration.group_rules : [],
+          };
           const textSettings =
             next.text_settings && typeof next.text_settings === "object" && !Array.isArray(next.text_settings)
               ? next.text_settings
@@ -1008,7 +1369,9 @@
             scan_note: record && record.scan_note ? String(record.scan_note) : "",
           }));
           return next;
-        }        function renderUserGroups() {
+        }
+
+        function renderUserGroups() {
           userGroupsBody.replaceChildren();
           if (!config.user_groups.length) {
             const row = document.createElement("tr");
@@ -1016,13 +1379,17 @@
             cell.className = "empty-row";
             cell.colSpan = 4;
             userGroupsBody.append(row);
+            refreshMusicUserGroupOptions();
             return;
           }
           config.user_groups.forEach((group, index) => {
             const row = document.createElement("tr");
             const nameCell = document.createElement("td");
             const nameInput = makeInput(group.name, "用户组名称");
-            nameInput.addEventListener("input", () => { group.name = nameInput.value; });
+            nameInput.addEventListener("input", () => {
+              group.name = nameInput.value;
+              refreshMusicUserGroupOptions();
+            });
             nameCell.append(nameInput);
             row.append(nameCell);
 
@@ -1052,12 +1419,15 @@
             removeButton.setAttribute("aria-label", "删除用户组 " + String(index + 1));
             removeButton.addEventListener("click", () => {
               config.user_groups.splice(index, 1);
+              syncMusicUserGroupOverrides();
               renderUserGroups();
+              renderMusicUserGroupLimits();
             });
             actionCell.append(removeButton);
             row.append(actionCell);
             userGroupsBody.append(row);
           });
+          refreshMusicUserGroupOptions();
         }
 
         function renderGroupRules() {
@@ -1100,7 +1470,19 @@
           });
         }
 
+        function syncMusicUserGroupOverrides() {
+          const validIds = new Set(
+            config.user_groups
+              .map((group) => String(group && group.id || ""))
+              .filter(Boolean),
+          );
+          config.music_integration.user_group_limits = config.music_integration.user_group_limits.filter(
+            (rule) => rule && validIds.has(String(rule.user_group_id || "")),
+          );
+        }
+
         function renderQuota() {
+          syncMusicUserGroupOverrides();
           byId("reset-time").value = config.reset_time || "00:00";
           byId("default-user-limit").value = config.default_user_limit == null ? "" : String(config.default_user_limit);
           byId("default-group-limit").value = config.default_group_limit == null ? "" : String(config.default_group_limit);
@@ -1110,9 +1492,46 @@
 
         function renderTextSettings() {
           textSettingsRoot.replaceChildren();
+          textCategoryButtons.length = 0;
+          const tablist = document.createElement("div");
+          tablist.className = "text-category-tabs";
+          tablist.setAttribute("role", "tablist");
+          tablist.setAttribute("aria-label", "回复文本分类");
+
+          textSections.forEach((section, index) => {
+            const button = document.createElement("button");
+            button.className = "text-category-tab";
+            button.id = "text-category-tab-" + section.id;
+            button.type = "button";
+            button.setAttribute("role", "tab");
+            button.setAttribute("aria-controls", "text-category-panel-" + section.id);
+            button.setAttribute("aria-selected", section.id === activeTextCategory ? "true" : "false");
+            button.tabIndex = section.id === activeTextCategory ? 0 : -1;
+            button.textContent = section.title;
+            button.addEventListener("click", () => selectTextCategory(section.id, false));
+            button.addEventListener("keydown", (event) => {
+              let nextIndex = index;
+              if (event.key === "ArrowRight") nextIndex = (index + 1) % textSections.length;
+              else if (event.key === "ArrowLeft") nextIndex = (index + textSections.length - 1) % textSections.length;
+              else if (event.key === "Home") nextIndex = 0;
+              else if (event.key === "End") nextIndex = textSections.length - 1;
+              else return;
+              event.preventDefault();
+              selectTextCategory(textSections[nextIndex].id, true);
+            });
+            textCategoryButtons.push(button);
+            tablist.append(button);
+          });
+          textSettingsRoot.append(tablist);
+
           textSections.forEach((section) => {
             const card = document.createElement("section");
             card.className = "card";
+            card.id = "text-category-panel-" + section.id;
+            card.setAttribute("role", "tabpanel");
+            card.setAttribute("aria-labelledby", "text-category-tab-" + section.id);
+            card.tabIndex = 0;
+            card.hidden = section.id !== activeTextCategory;
             const heading = document.createElement("div");
             heading.className = "card-heading";
             const title = document.createElement("h2");
@@ -1144,6 +1563,195 @@
             card.append(grid);
             textSettingsRoot.append(card);
           });
+        }
+
+        function selectTextCategory(category, moveFocus) {
+          if (!textSections.some((section) => section.id === category)) return;
+          activeTextCategory = category;
+          textSections.forEach((section) => {
+            const selected = section.id === category;
+            const button = byId("text-category-tab-" + section.id);
+            const panel = byId("text-category-panel-" + section.id);
+            button.setAttribute("aria-selected", selected ? "true" : "false");
+            button.tabIndex = selected ? 0 : -1;
+            panel.hidden = !selected;
+            panel.setAttribute("aria-labelledby", "text-category-tab-" + section.id);
+            if (selected && moveFocus) button.focus();
+          });
+        }
+
+        function updateMusicIntegrationVisibility() {
+          const enabled = byId("music-integration-enabled").checked;
+          const independent = byId("music-independent-quota").checked;
+          byId("music-integration-controls").hidden = !enabled;
+          byId("music-multiplier-field").hidden = !enabled || independent;
+          byId("music-multiplier").disabled = !enabled || independent;
+          byId("music-independent-settings").hidden = !enabled || !independent;
+          ["music-default-user-limit", "music-default-group-limit", "add-music-user-group-limit", "add-music-group-rule"].forEach((id) => {
+            byId(id).disabled = !enabled || !independent;
+          });
+          [byId("music-user-group-limits"), byId("music-group-rules")].forEach((body) => {
+            Array.from(body.children).forEach((row) => {
+              Array.from(row.children).forEach((cell) => {
+                Array.from(cell.children || []).forEach((control) => {
+                  control.disabled = !enabled || !independent;
+                });
+              });
+            });
+          });
+          byId("music-usage-card").hidden = !enabled || !independent;
+
+          const modeHint = byId("music-mode-hint");
+          if (!enabled) {
+            modeHint.textContent = "点歌额度联动当前关闭；保存后不执行点歌额度检查或扣减。";
+          } else if (independent) {
+            modeHint.textContent = "当前选择独立点歌配额；修改需保存后才会应用，未保存前服务仍使用已保存设置。";
+          } else {
+            modeHint.textContent = "当前选择共享聊天配额；每次成功点歌按设置的倍数消耗，修改需保存后才会应用。";
+          }
+        }
+
+        function renderMusicUserGroupLimits() {
+          const body = byId("music-user-group-limits");
+          body.replaceChildren();
+          const rules = config.music_integration.user_group_limits;
+          if (!rules.length) {
+            const row = document.createElement("tr");
+            const cell = makeCell(row, "暂无用户组覆盖");
+            cell.className = "empty-row";
+            cell.colSpan = 3;
+            body.append(row);
+            updateMusicIntegrationVisibility();
+            return;
+          }
+
+          rules.forEach((rule, index) => {
+            const row = document.createElement("tr");
+            row.dataset.musicUserGroupLimit = "true";
+            const groupCell = document.createElement("td");
+            const groupSelect = document.createElement("select");
+            groupSelect.className = "table-input table-select";
+            groupSelect.setAttribute("aria-label", "点歌额度覆盖用户组");
+            const emptyOption = document.createElement("option");
+            emptyOption.value = "";
+            emptyOption.textContent = "选择用户组";
+            groupSelect.append(emptyOption);
+            const userGroups = Array.isArray(config.user_groups) ? config.user_groups : [];
+            userGroups.forEach((group) => {
+              const option = document.createElement("option");
+              option.value = String(group.id || "");
+              option.textContent = String(group.name || "未命名用户组");
+              groupSelect.append(option);
+            });
+            const selectedId = String(rule.user_group_id || "");
+            groupSelect.value = selectedId;
+            groupSelect.addEventListener("change", () => { rule.user_group_id = groupSelect.value; });
+            groupCell.append(groupSelect);
+            row.append(groupCell);
+
+            const limitCell = document.createElement("td");
+            const limitInput = makeLimitInput(rule.daily_limit, "用户组独立点歌每日配额（留空继承默认值）");
+            limitInput.placeholder = "继承默认值";
+            limitInput.addEventListener("input", () => { rule.daily_limit = readInteger(limitInput.value); });
+            limitCell.append(limitInput);
+            row.append(limitCell);
+
+            const actionCell = document.createElement("td");
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "button button-danger";
+            removeButton.textContent = "删除";
+            removeButton.setAttribute("aria-label", "删除用户组点歌额度 " + String(index + 1));
+            removeButton.addEventListener("click", () => {
+              rules.splice(index, 1);
+              renderMusicUserGroupLimits();
+            });
+            actionCell.append(removeButton);
+            row.append(actionCell);
+            body.append(row);
+          });
+          updateMusicIntegrationVisibility();
+        }
+
+        function refreshMusicUserGroupOptions() {
+          const body = byId("music-user-group-limits");
+          const userGroups = Array.isArray(config && config.user_groups) ? config.user_groups : [];
+          Array.from(body.children).forEach((row) => {
+            if (!row.dataset || row.dataset.musicUserGroupLimit !== "true") return;
+            const select = row.children[0].children[0];
+            const selectedId = String(select.value || "");
+            const options = [];
+            const emptyOption = document.createElement("option");
+            emptyOption.value = "";
+            emptyOption.textContent = "选择用户组";
+            options.push(emptyOption);
+            userGroups.forEach((group) => {
+              const option = document.createElement("option");
+              option.value = String(group.id || "");
+              option.textContent = String(group.name || "未命名用户组");
+              options.push(option);
+            });
+            select.replaceChildren(...options);
+            select.value = selectedId;
+          });
+        }
+
+        function renderMusicGroupRules() {
+          const body = byId("music-group-rules");
+          body.replaceChildren();
+          const rules = config.music_integration.group_rules;
+          if (!rules.length) {
+            const row = document.createElement("tr");
+            const cell = makeCell(row, "暂无点歌群规则");
+            cell.className = "empty-row";
+            cell.colSpan = 3;
+            body.append(row);
+            updateMusicIntegrationVisibility();
+            return;
+          }
+
+          rules.forEach((rule, index) => {
+            const row = document.createElement("tr");
+            row.dataset.musicGroupRule = "true";
+            const groupCell = document.createElement("td");
+            const groupInput = makeInput(rule.group_id, "点歌群号", "numeric");
+            groupInput.addEventListener("input", () => { rule.group_id = groupInput.value; });
+            groupCell.append(groupInput);
+            row.append(groupCell);
+
+            const limitCell = document.createElement("td");
+            const limitInput = makeLimitInput(rule.daily_limit, "群独立点歌每日配额");
+            limitInput.addEventListener("input", () => { rule.daily_limit = readInteger(limitInput.value); });
+            limitCell.append(limitInput);
+            row.append(limitCell);
+
+            const actionCell = document.createElement("td");
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "button button-danger";
+            removeButton.textContent = "删除";
+            removeButton.setAttribute("aria-label", "删除点歌群规则 " + String(index + 1));
+            removeButton.addEventListener("click", () => {
+              rules.splice(index, 1);
+              renderMusicGroupRules();
+            });
+            actionCell.append(removeButton);
+            row.append(actionCell);
+            body.append(row);
+          });
+          updateMusicIntegrationVisibility();
+        }
+
+        function renderMusicIntegration() {
+          const integration = config.music_integration;
+          byId("music-integration-enabled").checked = Boolean(integration.enabled);
+          byId("music-independent-quota").checked = Boolean(integration.independent_quota);
+          byId("music-multiplier").value = integration.multiplier == null ? "1" : String(integration.multiplier);
+          byId("music-default-user-limit").value = integration.default_user_limit == null ? "70" : String(integration.default_user_limit);
+          byId("music-default-group-limit").value = integration.default_group_limit == null ? "200" : String(integration.default_group_limit);
+          renderMusicUserGroupLimits();
+          renderMusicGroupRules();
+          updateMusicIntegrationVisibility();
         }
 
         function recordStatusLabel(status) {
@@ -1556,6 +2164,7 @@
         function renderConfig() {
           renderQuota();
           renderTextSettings();
+          renderMusicIntegration();
           renderBalanceRecords();
           renderBalanceResults();
         }
@@ -1584,7 +2193,9 @@
           if (mode === "blacklist") return "0";
           if (mode === "unlimited") return "不限额";
           return formatCount(item.remaining);
-        }        function formatBeijingDateTime(value) {
+        }
+
+        function formatBeijingDateTime(value) {
           if (value == null || value === "") return "—";
           const date = new Date(value);
           if (Number.isNaN(date.getTime())) return String(value);
@@ -1609,36 +2220,274 @@
           return period.includes("T") ? formatBeijingDateTime(period) : period;
         }
 
+        function finiteUsageNumber(value) {
+          if (typeof value !== "number" && typeof value !== "string") return null;
+          if (typeof value === "string" && !value.trim()) return null;
+          const number = Number(value);
+          return Number.isFinite(number) ? number : null;
+        }
+
+        function usageSortValue(item, key) {
+          const row = item && typeof item === "object" ? item : {};
+          const total = finiteUsageNumber(row.total);
+          const blacklist = row.mode === "blacklist" || total === -1;
+          const unlimited = row.mode === "unlimited" || total === 0;
+
+          if (key === "total") {
+            if (blacklist) return { valid: true, value: -Infinity };
+            if (unlimited) return { valid: true, value: Infinity };
+            return { valid: total !== null, value: total };
+          }
+          if (key === "remaining") {
+            if (blacklist) return { valid: true, value: 0 };
+            if (unlimited) return { valid: true, value: Infinity };
+            const remaining = finiteUsageNumber(row.remaining);
+            return { valid: remaining !== null, value: remaining };
+          }
+          const used = finiteUsageNumber(row.used);
+          return { valid: used !== null, value: used };
+        }
+
+        function compareUsageIdentifier(left, right) {
+          const leftText = left == null ? "" : String(left);
+          const rightText = right == null ? "" : String(right);
+          if (leftText < rightText) return -1;
+          if (leftText > rightText) return 1;
+          return 0;
+        }
+
+        function compareUsageRows(left, right, sort) {
+          const leftValue = usageSortValue(left, sort.key);
+          const rightValue = usageSortValue(right, sort.key);
+          if (leftValue.valid !== rightValue.valid) return leftValue.valid ? -1 : 1;
+          if (leftValue.valid) {
+            let comparison = 0;
+            if (leftValue.value < rightValue.value) comparison = -1;
+            else if (leftValue.value > rightValue.value) comparison = 1;
+            if (comparison) return sort.direction === "asc" ? comparison : -comparison;
+          }
+          return compareUsageIdentifier(left.platform_id, right.platform_id) ||
+            compareUsageIdentifier(left.target_id, right.target_id);
+        }
+
+        function sortedUsageRows(rows, kind, sort) {
+          return rows
+            .map((item, index) => ({ item, index }))
+            .filter(({ item }) => item && item.kind === kind)
+            .sort((left, right) => compareUsageRows(left.item, right.item, sort) || left.index - right.index)
+            .map(({ item }) => item);
+        }
+
+        function nextUsageSort(current, key) {
+          if (current.key === key) {
+            return { key, direction: current.direction === "desc" ? "asc" : "desc" };
+          }
+          return { key, direction: "desc" };
+        }
+
+        function selectUsageSort(key) {
+          if (key !== "used" && key !== "total" && key !== "remaining") return;
+          const kind = activeUsageKind;
+          usageSorts[kind] = nextUsageSort(usageSorts[kind], key);
+          renderUsage();
+        }
+
+        function formatUsageName(value) {
+          const name = value == null ? "" : String(value).trim();
+          return name || "暂未获取";
+        }
+
+        function updateUsageSortHeaders() {
+          const sort = usageSorts[activeUsageKind];
+          usageSortButtons.forEach((button) => {
+            const header = byId("usage-sort-header-" + button.dataset.usageSort);
+            header.setAttribute(
+              "aria-sort",
+              sort.key === button.dataset.usageSort
+                ? sort.direction === "asc" ? "ascending" : "descending"
+                : "none",
+            );
+          });
+        }
+
+        function selectUsageKind(kind, moveFocus) {
+          if (kind !== "private" && kind !== "group") return;
+          activeUsageKind = kind;
+          byId("usage-panel").setAttribute(
+            "aria-labelledby",
+            kind === "private" ? "usage-tab-private" : "usage-tab-group",
+          );
+          usageTabButtons.forEach((button) => {
+            const selected = button.dataset.usageKind === kind;
+            button.setAttribute("aria-selected", selected ? "true" : "false");
+            button.tabIndex = selected ? 0 : -1;
+            if (selected && moveFocus) button.focus();
+          });
+          renderUsage();
+        }
+
         function renderUsage(rows) {
+          if (Array.isArray(rows)) usageRecords = rows.filter((item) => item && typeof item === "object");
           usageRowsBody.replaceChildren();
-          if (!rows.length) {
+          updateUsageSortHeaders();
+          const visibleRows = sortedUsageRows(usageRecords, activeUsageKind, usageSorts[activeUsageKind]);
+          if (!visibleRows.length) {
             const row = document.createElement("tr");
-            const cell = makeCell(row, "暂无用量记录");
+            const cell = makeCell(row, activeUsageKind === "private" ? "暂无私聊用量记录" : "暂无群聊用量记录");
             cell.className = "empty-row";
             cell.colSpan = 9;
             usageRowsBody.append(row);
             return;
           }
-          rows.forEach((item) => {
+          visibleRows.forEach((item) => {
             const row = document.createElement("tr");
-            makeCell(row, item.platform_id == null ? "—" : String(item.platform_id));
-            const kindLabel = item.kind === "private"
-              ? "私聊"
-              : item.kind === "group"
-                ? "群聊"
-                : item.kind == null
-                  ? "—"
-                  : String(item.kind);
-            makeCell(row, kindLabel);
-            makeCell(row, item.target_id == null ? "—" : String(item.target_id));
+            const platformCell = makeCell(row, item.platform_id == null ? "—" : String(item.platform_id));
+            platformCell.className = "usage-platform";
+            const targetCell = makeCell(row, item.target_id == null ? "—" : String(item.target_id));
+            targetCell.className = "usage-target";
+            const nameCell = makeCell(row, formatUsageName(item.display_name));
+            nameCell.className = "usage-name";
             makeCell(row, formatPeriod(item.period));
-            makeCell(row, formatCount(item.used));
-            makeCell(row, formatQuotaTotal(item));
-            makeCell(row, formatCount(item.reserved));
-            makeCell(row, formatRemaining(item));
+            makeCell(row, formatCount(item.used)).className = "usage-count";
+            makeCell(row, formatQuotaTotal(item)).className = "usage-count";
+            makeCell(row, formatCount(item.reserved)).className = "usage-count";
+            makeCell(row, formatRemaining(item)).className = "usage-count";
             makeCell(row, formatBeijingDateTime(item.reset_at));
             usageRowsBody.append(row);
           });
+        }
+
+        function updateMusicUsageSortHeaders() {
+          const sort = musicUsageSorts[activeMusicUsageKind];
+          musicUsageSortButtons.forEach((button) => {
+            const header = byId("music-usage-sort-header-" + button.dataset.musicUsageSort);
+            header.setAttribute(
+              "aria-sort",
+              sort.key === button.dataset.musicUsageSort
+                ? sort.direction === "asc" ? "ascending" : "descending"
+                : "none",
+            );
+          });
+        }
+
+        function selectMusicUsageSort(key) {
+          if (key !== "used" && key !== "total" && key !== "remaining") return;
+          const kind = activeMusicUsageKind;
+          musicUsageSorts[kind] = nextUsageSort(musicUsageSorts[kind], key);
+          renderMusicUsage();
+        }
+
+        function selectMusicUsageKind(kind, moveFocus) {
+          if (kind !== "private" && kind !== "group") return;
+          activeMusicUsageKind = kind;
+          byId("music-usage-panel").setAttribute(
+            "aria-labelledby",
+            kind === "private" ? "music-usage-tab-private" : "music-usage-tab-group",
+          );
+          musicUsageTabButtons.forEach((button) => {
+            const selected = button.dataset.musicUsageKind === kind;
+            button.setAttribute("aria-selected", selected ? "true" : "false");
+            button.tabIndex = selected ? 0 : -1;
+            if (selected && moveFocus) button.focus();
+          });
+          renderMusicUsage();
+        }
+
+        function renderMusicUsage(rows) {
+          if (Array.isArray(rows)) musicUsageRecords = rows.filter((item) => item && typeof item === "object");
+          musicUsageRowsBody.replaceChildren();
+          updateMusicUsageSortHeaders();
+          const visibleRows = sortedUsageRows(
+            musicUsageRecords,
+            activeMusicUsageKind,
+            musicUsageSorts[activeMusicUsageKind],
+          );
+          if (!visibleRows.length) {
+            const row = document.createElement("tr");
+            const cell = makeCell(row, activeMusicUsageKind === "private" ? "暂无私聊点歌用量记录" : "暂无群聊点歌用量记录");
+            cell.className = "empty-row";
+            cell.colSpan = 9;
+            musicUsageRowsBody.append(row);
+            return;
+          }
+          visibleRows.forEach((item) => {
+            const row = document.createElement("tr");
+            const platformCell = makeCell(row, item.platform_id == null ? "—" : String(item.platform_id));
+            platformCell.className = "usage-platform";
+            const targetCell = makeCell(row, item.target_id == null ? "—" : String(item.target_id));
+            targetCell.className = "usage-target";
+            const nameCell = makeCell(row, formatUsageName(item.display_name));
+            nameCell.className = "usage-name";
+            makeCell(row, formatPeriod(item.period));
+            makeCell(row, formatCount(item.used)).className = "usage-count";
+            makeCell(row, formatQuotaTotal(item)).className = "usage-count";
+            makeCell(row, formatCount(item.reserved)).className = "usage-count";
+            makeCell(row, formatRemaining(item)).className = "usage-count";
+            makeCell(row, formatBeijingDateTime(item.reset_at));
+            musicUsageRowsBody.append(row);
+          });
+        }
+
+        function renderMusicStatus(status) {
+          if (!status || typeof status !== "object") {
+            setStatus(byId("music-integration-status"), "无法读取 Better Music 联动状态。", "warning");
+            return;
+          }
+          let message = "";
+          let tone = "warning";
+          const version = status.api_version ? "（API " + String(status.api_version) + "）" : "";
+          if (!status.installed) {
+            message = "未安装 Better Music 插件；点歌额度联动不可用。安装兼容版本后可启用。";
+          } else if (!status.compatible) {
+            message = "已安装 Better Music，但版本不兼容" + version + "；请升级到支持额度联动的版本。";
+          } else if (!status.connected) {
+            message = "Better Music 已安装且版本兼容" + version + "，但当前未连接；请确认插件已启用。";
+          } else {
+            message = "已连接 Better Music" + version + "；服务当前联动" + (status.enabled ? "已启用" : "已关闭") + "。";
+            tone = "success";
+          }
+          if (status.message) message += " " + String(status.message);
+          setStatus(byId("music-integration-status"), message, tone);
+        }
+
+        async function refreshMusicStatus() {
+          try {
+            const response = await bridge.apiGet("music/status");
+            renderMusicStatus(response && response.status);
+          } catch (error) {
+            setStatus(
+              byId("music-integration-status"),
+              "暂时无法读取点歌联动状态；仍可编辑其他配置，确认 Better Music 兼容后再启用。",
+              "warning",
+            );
+          }
+        }
+
+        async function refreshMusicUsage() {
+          const button = byId("refresh-music-usage");
+          if (!config || !config.music_integration.enabled || !config.music_integration.independent_quota) {
+            musicUsageRecords = [];
+            renderMusicUsage();
+            setStatus(byId("music-usage-status"), "启用并保存独立点歌配额后显示用量。", "");
+            return;
+          }
+          button.disabled = true;
+          setStatus(byId("music-usage-status"), "正在读取点歌用量…", "");
+          try {
+            const response = await bridge.apiGet("music/usage");
+            const rows = response && Array.isArray(response.usage) ? response.usage : [];
+            renderMusicUsage(rows);
+            if (response && response.status) renderMusicStatus(response.status);
+            setStatus(byId("music-usage-status"), "已更新", "");
+          } catch (error) {
+            setStatus(
+              byId("music-usage-status"),
+              error && error.message ? error.message : "暂时无法读取点歌用量；聊天用量显示不受影响。",
+              "error",
+            );
+          } finally {
+            button.disabled = false;
+          }
         }
 
         async function loadConfig() {
@@ -1676,6 +2525,8 @@
             } catch (catalogError) {
               setStatus(balanceCatalogStatus, catalogError && catalogError.message ? catalogError.message : "读取余额供应商目录失败", "error");
             }
+            await refreshMusicStatus();
+            await refreshMusicUsage();
             setStatus(saveStatus, "已重新读取已保存的设置。", "success");
           } catch (error) {
             setStatus(saveStatus, error && error.message ? error.message : "读取设置失败", "error");
@@ -1717,10 +2568,140 @@
           return "";
         }
 
+        function collectMusicIntegrationConfig() {
+          const previous = config.music_integration || { ...defaultMusicIntegration };
+          const enabled = byId("music-integration-enabled").checked;
+          const independent = byId("music-independent-quota").checked;
+          const validateIndependentRules = Boolean(enabled && independent);
+          musicValidationTarget = null;
+          const multiplierInput = byId("music-multiplier").value;
+          const multiplier = readInteger(multiplierInput);
+          const defaultUserInput = byId("music-default-user-limit").value;
+          const defaultGroupInput = byId("music-default-group-limit").value;
+          const defaultUserLimit = readInteger(defaultUserInput);
+          const defaultGroupLimit = readInteger(defaultGroupInput);
+
+          if (enabled && !independent && (multiplier == null || multiplier < 1)) {
+            musicValidationTarget = byId("music-multiplier");
+            return "聊天配额倍数必须是大于等于 1 的整数。";
+          }
+          if (validateIndependentRules) {
+            if (defaultUserLimit == null || defaultUserLimit < -1) {
+              musicValidationTarget = byId("music-default-user-limit");
+              return "独立点歌默认配额必须是整数：-1 表示禁止，0 表示不限额，正整数表示次数。";
+            }
+            if (defaultGroupLimit == null || defaultGroupLimit < -1) {
+              musicValidationTarget = byId("music-default-group-limit");
+              return "独立点歌默认配额必须是整数：-1 表示禁止，0 表示不限额，正整数表示次数。";
+            }
+          }
+
+          const validUserGroupIds = new Set(
+            config.user_groups.map((group) => String(group && group.id || "")).filter(Boolean),
+          );
+          const userGroupLimits = previous.user_group_limits
+            .map((rule) => ({
+              user_group_id: String(rule && rule.user_group_id || ""),
+              daily_limit: readInteger(rule && rule.daily_limit),
+            }))
+            .filter((rule) => validUserGroupIds.has(rule.user_group_id) && rule.daily_limit != null && rule.daily_limit >= -1);
+          let groupRules = previous.group_rules
+            .map((rule) => ({
+              group_id: String(rule && rule.group_id || "").trim(),
+              daily_limit: readInteger(rule && rule.daily_limit),
+            }))
+            .filter((rule) => rule.group_id && rule.daily_limit != null && rule.daily_limit >= -1);
+
+          if (validateIndependentRules) {
+            userGroupLimits.length = 0;
+            groupRules = [];
+          }
+          const seenUserGroups = new Set();
+          if (validateIndependentRules) for (const row of Array.from(byId("music-user-group-limits").children)) {
+            if (!row.dataset || row.dataset.musicUserGroupLimit !== "true") continue;
+            const userGroupId = String(row.children[0].children[0].value || "").trim();
+            const rawLimit = String(row.children[1].children[0].value || "").trim();
+            if (!userGroupId) {
+              if (rawLimit) {
+                musicValidationTarget = row.children[0].children[0];
+                return "用户组点歌额度需要先选择用户组。";
+              }
+              continue;
+            }
+            if (!validUserGroupIds.has(userGroupId)) {
+              musicValidationTarget = row.children[0].children[0];
+              return "该用户组已不存在；请在配额管理中重新选择用户组。";
+            }
+            if (!rawLimit) continue;
+            const dailyLimit = readInteger(rawLimit);
+            if (dailyLimit == null || dailyLimit < -1) {
+              musicValidationTarget = row.children[1].children[0];
+              return "用户组点歌配额必须是整数；留空表示继承，-1 表示禁止，0 表示不限额。";
+            }
+            if (seenUserGroups.has(userGroupId)) {
+              musicValidationTarget = row.children[0].children[0];
+              return "每个用户组只能设置一条点歌额度覆盖。";
+            }
+            seenUserGroups.add(userGroupId);
+            userGroupLimits.push({ user_group_id: userGroupId, daily_limit: dailyLimit });
+          }
+
+          const seenGroups = new Set();
+          if (validateIndependentRules) for (const row of Array.from(byId("music-group-rules").children)) {
+            if (!row.dataset || row.dataset.musicGroupRule !== "true") continue;
+            const groupId = String(row.children[0].children[0].value || "").trim();
+            const rawLimit = String(row.children[1].children[0].value || "").trim();
+            if (!groupId && !rawLimit) continue;
+            if (!groupId) {
+              musicValidationTarget = row.children[0].children[0];
+              return "点歌群规则需要填写 QQ 群号和每日配额。";
+            }
+            if (!rawLimit) {
+              musicValidationTarget = row.children[1].children[0];
+              return "点歌群规则需要填写 QQ 群号和每日配额。";
+            }
+            const dailyLimit = readInteger(rawLimit);
+            if (dailyLimit == null || dailyLimit < -1) {
+              musicValidationTarget = row.children[1].children[0];
+              return "群点歌配额必须是整数：-1 表示禁止，0 表示不限额，正整数表示次数。";
+            }
+            if (seenGroups.has(groupId)) {
+              musicValidationTarget = row.children[0].children[0];
+              return "点歌群规则的 QQ 群号不能重复。";
+            }
+            seenGroups.add(groupId);
+            groupRules.push({ group_id: groupId, daily_limit: dailyLimit });
+          }
+
+          config.music_integration = {
+            enabled,
+            independent_quota: independent,
+            multiplier: multiplier != null && multiplier >= 1 ? multiplier : previous.multiplier,
+            default_user_limit: defaultUserLimit != null && defaultUserLimit >= -1 ? defaultUserLimit : previous.default_user_limit,
+            default_group_limit: defaultGroupLimit != null && defaultGroupLimit >= -1 ? defaultGroupLimit : previous.default_group_limit,
+            user_group_limits: userGroupLimits,
+            group_rules: groupRules,
+          };
+          return "";
+        }
+
         function statusForScope(scope) {
           if (scope === "balance") return balanceSaveStatus;
           if (scope === "text") return textSaveStatus;
+          if (scope === "music") return byId("music-save-status");
           return saveStatus;
+        }
+
+        function selectSectionTab(tab, moveFocus) {
+          if (!sectionTabButtons.includes(tab)) return;
+          sectionTabButtons.forEach((candidate) => {
+            const selected = candidate === tab;
+            candidate.setAttribute("aria-selected", selected ? "true" : "false");
+            candidate.tabIndex = selected ? 0 : -1;
+            const panel = byId(candidate.getAttribute("aria-controls"));
+            if (panel) panel.hidden = !selected;
+          });
+          if (moveFocus) tab.focus();
         }
 
         async function saveConfig(scope) {
@@ -1745,6 +2726,13 @@
               return;
             }
           }
+          const musicError = collectMusicIntegrationConfig();
+          if (musicError) {
+            selectSectionTab(byId("tab-music"), false);
+            setStatus(byId("music-save-status"), "联动管理设置：" + musicError, "error");
+            if (musicValidationTarget) musicValidationTarget.focus();
+            return;
+          }
           saveButtons.forEach((button) => { button.disabled = true; });
           setStatus(statusForScope(scope), "正在保存全部设置…", "");
           try {
@@ -1755,6 +2743,8 @@
             renderConfig();
             setStatus(statusForScope(scope), "已保存全部设置。", "success");
             await refreshUsage();
+            await refreshMusicStatus();
+            await refreshMusicUsage();
           } catch (error) {
             setStatus(statusForScope(scope), error && error.message ? error.message : "保存设置失败", "error");
           } finally {
@@ -1912,6 +2902,21 @@
           renderGroupRules();
         });
 
+        byId("add-music-user-group-limit").addEventListener("click", () => {
+          if (!config) return;
+          config.music_integration.user_group_limits.push({ user_group_id: "", daily_limit: null });
+          renderMusicUserGroupLimits();
+        });
+
+        byId("add-music-group-rule").addEventListener("click", () => {
+          if (!config) return;
+          config.music_integration.group_rules.push({ group_id: "", daily_limit: 200 });
+          renderMusicGroupRules();
+        });
+
+        byId("music-integration-enabled").addEventListener("change", updateMusicIntegrationVisibility);
+        byId("music-independent-quota").addEventListener("change", updateMusicIntegrationVisibility);
+
         byId("reset-time").addEventListener("input", (event) => {
           if (config) config.reset_time = event.currentTarget.value;
         });
@@ -1927,6 +2932,39 @@
         });
         byId("refresh-usage").addEventListener("click", refreshUsage);
         byId("refresh-usage-card").addEventListener("click", refreshUsage);
+        byId("refresh-music-usage").addEventListener("click", refreshMusicUsage);
+        usageTabButtons.forEach((button, index) => {
+          button.addEventListener("click", () => selectUsageKind(button.dataset.usageKind, false));
+          button.addEventListener("keydown", (event) => {
+            let nextIndex = index;
+            if (event.key === "ArrowRight") nextIndex = (index + 1) % usageTabButtons.length;
+            else if (event.key === "ArrowLeft") nextIndex = (index + usageTabButtons.length - 1) % usageTabButtons.length;
+            else if (event.key === "Home") nextIndex = 0;
+            else if (event.key === "End") nextIndex = usageTabButtons.length - 1;
+            else return;
+            event.preventDefault();
+            selectUsageKind(usageTabButtons[nextIndex].dataset.usageKind, true);
+          });
+        });
+        usageSortButtons.forEach((button) => {
+          button.addEventListener("click", () => selectUsageSort(button.dataset.usageSort));
+        });
+        musicUsageTabButtons.forEach((button, index) => {
+          button.addEventListener("click", () => selectMusicUsageKind(button.dataset.musicUsageKind, false));
+          button.addEventListener("keydown", (event) => {
+            let nextIndex = index;
+            if (event.key === "ArrowRight") nextIndex = (index + 1) % musicUsageTabButtons.length;
+            else if (event.key === "ArrowLeft") nextIndex = (index + musicUsageTabButtons.length - 1) % musicUsageTabButtons.length;
+            else if (event.key === "Home") nextIndex = 0;
+            else if (event.key === "End") nextIndex = musicUsageTabButtons.length - 1;
+            else return;
+            event.preventDefault();
+            selectMusicUsageKind(musicUsageTabButtons[nextIndex].dataset.musicUsageKind, true);
+          });
+        });
+        musicUsageSortButtons.forEach((button) => {
+          button.addEventListener("click", () => selectMusicUsageSort(button.dataset.musicUsageSort));
+        });
         reloadConfigButton.addEventListener("click", reloadConfig);
         byId("reload-balance-catalog").addEventListener("click", async () => {
           const button = byId("reload-balance-catalog");
@@ -1944,15 +2982,34 @@
         byId("add-balance-record").addEventListener("click", addBalanceRecord);
         byId("query-all-balances").addEventListener("click", queryAllBalances);
 
-        document.querySelectorAll('[role="tab"]').forEach((tab) => {
-          tab.addEventListener("click", () => {
-            document.querySelectorAll('[role="tab"]').forEach((candidate) => {
-              candidate.setAttribute("aria-selected", candidate === tab ? "true" : "false");
-            });
-            document.querySelectorAll('[role="tabpanel"]').forEach((panel) => {
-              panel.hidden = panel.id !== tab.getAttribute("aria-controls");
-            });
+        sectionTabButtons.forEach((tab, index) => {
+          tab.addEventListener("click", () => selectSectionTab(tab, false));
+          tab.addEventListener("keydown", (event) => {
+            let nextIndex = index;
+            if (event.key === "ArrowRight") nextIndex = (index + 1) % sectionTabButtons.length;
+            else if (event.key === "ArrowLeft") nextIndex = (index + sectionTabButtons.length - 1) % sectionTabButtons.length;
+            else if (event.key === "Home") nextIndex = 0;
+            else if (event.key === "End") nextIndex = sectionTabButtons.length - 1;
+            else return;
+            event.preventDefault();
+            selectSectionTab(sectionTabButtons[nextIndex], true);
           });
+        });
+
+        byId("music-multiplier").addEventListener("input", () => {
+          if (!config) return;
+          const value = readInteger(byId("music-multiplier").value);
+          if (value != null && value >= 1) config.music_integration.multiplier = value;
+        });
+        byId("music-default-user-limit").addEventListener("input", () => {
+          if (!config) return;
+          const value = readInteger(byId("music-default-user-limit").value);
+          if (value != null && value >= -1) config.music_integration.default_user_limit = value;
+        });
+        byId("music-default-group-limit").addEventListener("input", () => {
+          if (!config) return;
+          const value = readInteger(byId("music-default-group-limit").value);
+          if (value != null && value >= -1) config.music_integration.default_group_limit = value;
         });
 
         async function initialize() {
@@ -1973,6 +3030,8 @@
             setStatus(balanceCatalogStatus, error && error.message ? error.message : "读取余额供应商目录失败", "error");
           }
           await refreshUsage();
+          await refreshMusicStatus();
+          await refreshMusicUsage();
         }
 
         initialize();

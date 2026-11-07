@@ -19,10 +19,27 @@ _SCALAR_KEYS = (
     "reset_time",
     "default_user_limit",
     "default_group_limit",
+    "music_integration",
     "text_settings",
 )
+_MUSIC_INTEGRATION_KEYS = {
+    "enabled",
+    "independent_quota",
+    "multiplier",
+    "default_user_limit",
+    "default_group_limit",
+    "user_group_limits",
+    "group_rules",
+}
 _LEGACY_EMPTY_KEYS = ("quota_management", "balance_management")
 _TEMPLATE_KINDS = {"user_groups": "user_group", "group_rules": "group_rule"}
+_MUSIC_TEMPLATE_LISTS = {
+    "user_group_limits": (
+        "user_group_limit",
+        {"user_group_id", "daily_limit"},
+    ),
+    "group_rules": ("music_group_rule", {"group_id", "daily_limit"}),
+}
 
 
 class NativeSettings:
@@ -53,9 +70,42 @@ class NativeSettings:
                 any(key in native for key in ALL_LEGACY_TEXT_KEYS)
                 or not isinstance(native_text, Mapping)
                 or set(native_text) != set(TEXT_DEFAULTS)
+                or not isinstance(native.get("music_integration"), Mapping)
+                or set(native.get("music_integration", {})) != _MUSIC_INTEGRATION_KEYS
             )
+            native_music = native.get("music_integration")
+            if isinstance(native_music, Mapping):
+                for key, (template_key, _fields) in _MUSIC_TEMPLATE_LISTS.items():
+                    entries = native_music.get(key)
+                    if isinstance(entries, list) and any(
+                        not isinstance(entry, Mapping)
+                        or entry.get("__template_key") != template_key
+                        for entry in entries
+                    ):
+                        self._needs_migration = True
             result = {key: native[key] for key in _SCALAR_KEYS if key in native}
             result["text_settings"] = migrate_text_settings(native)
+            if isinstance(native.get("music_integration"), Mapping):
+                music = copy.deepcopy(dict(native["music_integration"]))
+                for key, (template_key, fields) in _MUSIC_TEMPLATE_LISTS.items():
+                    entries = music.get(key)
+                    if not isinstance(entries, list):
+                        continue
+                    cleaned = []
+                    for entry in entries:
+                        if not isinstance(entry, Mapping):
+                            continue
+                        if entry.get("__template_key") not in {None, template_key}:
+                            continue
+                        cleaned.append(
+                            {
+                                field: copy.deepcopy(entry[field])
+                                for field in fields
+                                if field in entry
+                            }
+                        )
+                    music[key] = cleaned
+                result["music_integration"] = music
             if "balance_providers" in native:
                 records = []
                 entries = native.get("balance_providers")
@@ -117,10 +167,25 @@ class NativeSettings:
             schema_keys = set(schema) if isinstance(schema, Mapping) else None
             for key in _SCALAR_KEYS:
                 if key in canonical and (
-                    schema_keys is None or key in schema_keys or key in updated
+                    schema_keys is None
+                    or key in schema_keys
+                    or key in updated
                     or key == "text_settings"
                 ):
                     updated[key] = copy.deepcopy(canonical[key])
+
+            music = copy.deepcopy(canonical.get("music_integration"))
+            if isinstance(music, Mapping) and "music_integration" in updated:
+                music = copy.deepcopy(dict(music))
+                for key, (template_key, _fields) in _MUSIC_TEMPLATE_LISTS.items():
+                    entries = music.get(key)
+                    if isinstance(entries, list):
+                        music[key] = [
+                            {"__template_key": template_key, **copy.deepcopy(entry)}
+                            for entry in entries
+                            if isinstance(entry, Mapping)
+                        ]
+                updated["music_integration"] = music
 
             for key, template_key in _TEMPLATE_KINDS.items():
                 existing = updated.get(key)
@@ -133,7 +198,9 @@ class NativeSettings:
                     or entry.get("__template_key") not in {None, template_key}
                 ]
                 for entry in canonical[key]:
-                    retained.append({"__template_key": template_key, **copy.deepcopy(entry)})
+                    retained.append(
+                        {"__template_key": template_key, **copy.deepcopy(entry)}
+                    )
                 updated[key] = retained
 
             existing_records = updated.get("balance_providers")

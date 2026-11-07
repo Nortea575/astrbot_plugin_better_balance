@@ -1,10 +1,12 @@
 """Dashboard API handlers for the quota management view."""
 
+import asyncio
 from collections.abc import Mapping
 from urllib.parse import urlsplit, urlunsplit
 
 from astrbot.api.web import error_response, json_response, request
 
+from .target_names import TargetNameResolver
 
 PLUGIN_NAME = "astrbot_plugin_better_balance"
 
@@ -35,15 +37,25 @@ class WebAPI:
         compatibility_status: Optional zero-argument callback returning a status dict.
     """
 
+    TARGET_NAME_TIMEOUT_SECONDS = 3.0
+
     def __init__(
-        self, context, store, compatibility_status=None, balance_service=None
+        self,
+        context,
+        store,
+        compatibility_status=None,
+        balance_service=None,
+        music_integration=None,
     ):
         self.context = context
         self.store = store
         self.compatibility_status = compatibility_status
         self.balance_service = balance_service
+        self.music_integration = music_integration
         self._active = False
         self._registered = False
+        self._target_names = TargetNameResolver(context)
+        self._target_name_tasks: set[asyncio.Task] = set()
 
     def register(self):
         """Register the view API routes with AstrBot."""
@@ -67,6 +79,18 @@ class WebAPI:
             self.get_usage,
             ["GET"],
             "Read quota usage",
+        )
+        self.context.register_web_api(
+            f"/{PLUGIN_NAME}/music/status",
+            self.get_music_status,
+            ["GET"],
+            "Read Better Music integration status",
+        )
+        self.context.register_web_api(
+            f"/{PLUGIN_NAME}/music/usage",
+            self.get_music_usage,
+            ["GET"],
+            "Read independent music quota usage",
         )
         self.context.register_web_api(
             f"/{PLUGIN_NAME}/balance/catalog",
@@ -95,6 +119,9 @@ class WebAPI:
         method. A reload registers new handlers at the same plugin-owned routes.
         """
         self._active = False
+        for task in tuple(self._target_name_tasks):
+            task.cancel()
+        self._target_names.clear()
 
     async def get_config(self):
         """Return the saved quota configuration."""
@@ -117,6 +144,10 @@ class WebAPI:
             return error_response("配额配置必须是 JSON 对象", status_code=400)
         try:
             normalized = self.store.save_config(config)
+            if self.music_integration is not None:
+                configure = getattr(self.music_integration, "configure", None)
+                if callable(configure):
+                    configure()
         except ValueError as exc:
             return error_response(str(exc), status_code=400)
         except Exception:
@@ -138,7 +169,71 @@ class WebAPI:
                 compatibility = {}
         except Exception:
             return error_response("读取配额用量失败", status_code=500)
-        return json_response({"usage": usage, "compatibility": compatibility})
+
+        usage_rows = [dict(row) for row in usage if isinstance(row, Mapping)]
+        if not await self._add_display_names(usage_rows):
+            return error_response("插件页面 API 已停用", status_code=503)
+        return json_response({"usage": usage_rows, "compatibility": compatibility})
+
+    async def _add_display_names(self, usage_rows: list[dict]) -> bool:
+        for row in usage_rows:
+            row["display_name"] = ""
+        if usage_rows:
+            lookup_task = asyncio.create_task(
+                self._target_names.resolve_rows(usage_rows)
+            )
+            self._target_name_tasks.add(lookup_task)
+            lookup_task.add_done_callback(self._target_name_tasks.discard)
+            try:
+                names = await asyncio.wait_for(
+                    lookup_task, timeout=self.TARGET_NAME_TIMEOUT_SECONDS
+                )
+            except asyncio.CancelledError:
+                if self._active:
+                    raise
+                return False
+            except asyncio.TimeoutError:
+                names = self._target_names.cached_names(usage_rows)
+            except Exception:
+                names = self._target_names.cached_names(usage_rows)
+            for row, name in zip(usage_rows, names):
+                if isinstance(name, str):
+                    row["display_name"] = name
+        return self._active
+
+    def _music_status(self) -> dict:
+        service = self.music_integration
+        status = service.status() if service is not None else None
+        if not isinstance(status, dict):
+            return {
+                "installed": False,
+                "compatible": False,
+                "connected": False,
+                "enabled": False,
+                "independent_quota": False,
+                "api_version": None,
+                "message": "音乐额度联动状态不可用。",
+            }
+        return status
+
+    async def get_music_status(self):
+        """Return only the fixed integration state needed by the UI."""
+        if not self._active:
+            return error_response("插件页面 API 已停用", status_code=503)
+        return json_response({"status": self._music_status()})
+
+    async def get_music_usage(self):
+        """Return independent music quota rows with the current connection state."""
+        if not self._active:
+            return error_response("插件页面 API 已停用", status_code=503)
+        try:
+            usage = self.store.list_music_usage()
+        except Exception:
+            return error_response("读取点歌用量失败", status_code=500)
+        usage_rows = [dict(row) for row in usage if isinstance(row, Mapping)]
+        if not await self._add_display_names(usage_rows):
+            return error_response("插件页面 API 已停用", status_code=503)
+        return json_response({"usage": usage_rows, "status": self._music_status()})
 
     def _require_balance_service(self):
         if self.balance_service is None:

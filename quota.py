@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 import sqlite3
+import sys
 import threading
 import uuid
 from contextlib import contextmanager
@@ -21,7 +23,6 @@ from typing import Callable, Iterator, Mapping
 from .configuration import default_config as _canonical_defaults
 from .configuration import normalize_config
 from .settings import NativeSettings
-
 
 _BEIJING = timezone(timedelta(hours=8), name="Asia/Shanghai")
 _RESET_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
@@ -39,6 +40,28 @@ class Reservation:
     token: str
     scope: Scope
     period: str
+    units: int = 1
+    bucket: str = "chat"
+    external: bool = False
+
+
+@dataclass(frozen=True)
+class MusicReservationDecision:
+    reservation: Reservation | None
+    reason: str | None
+    snapshot: Mapping[str, object]
+    cost: int
+    multiplier: int
+    independent_quota: bool
+
+
+def _process_session_id() -> str:
+    """Keep one owner identity across AstrBot's in-process execv reloads."""
+    session = getattr(sys, "_astrbot_better_balance_process_session", None)
+    if not isinstance(session, str):
+        session = uuid.uuid4().hex
+        setattr(sys, "_astrbot_better_balance_process_session", session)
+    return f"{os.getpid()}:{session}"
 
 
 def _default_config() -> dict:
@@ -78,6 +101,8 @@ class Store:
         self._clock = clock or (lambda: datetime.now(_BEIJING))
         self._lock = threading.RLock()
         self._closed = False
+        self._closing = False
+        self._process_id = _process_session_id()
         self._session_id = uuid.uuid4().hex
         self._native_settings = NativeSettings(config) if config is not None else None
         self._conn = sqlite3.connect(
@@ -108,12 +133,45 @@ class Store:
                 period TEXT NOT NULL,
                 status TEXT NOT NULL CHECK (status IN ('pending', 'committed', 'released')),
                 owner_session TEXT NOT NULL,
+                owner_process TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
+                units INTEGER NOT NULL DEFAULT 1 CHECK (units >= 1),
+                bucket TEXT NOT NULL DEFAULT 'chat' CHECK (bucket IN ('chat', 'music')),
+                external_ticket INTEGER NOT NULL DEFAULT 0 CHECK (external_ticket IN (0, 1)),
                 UNIQUE (platform_id, kind, target_id, request_id)
             );
             CREATE INDEX IF NOT EXISTS reservations_scope_period_status
                 ON reservations (period, platform_id, kind, target_id, status);
             """
+        )
+        reservation_columns = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(reservations)")
+        }
+        if "units" not in reservation_columns:
+            self._conn.execute(
+                "ALTER TABLE reservations ADD COLUMN units INTEGER NOT NULL DEFAULT 1"
+            )
+        if "bucket" not in reservation_columns:
+            self._conn.execute(
+                "ALTER TABLE reservations ADD COLUMN bucket TEXT NOT NULL DEFAULT 'chat'"
+            )
+        if "external_ticket" not in reservation_columns:
+            self._conn.execute(
+                "ALTER TABLE reservations ADD COLUMN external_ticket INTEGER NOT NULL DEFAULT 0"
+            )
+        if "owner_process" not in reservation_columns:
+            self._conn.execute(
+                "ALTER TABLE reservations ADD COLUMN owner_process TEXT NOT NULL DEFAULT ''"
+            )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS reservations_bucket_scope_period_status "
+            "ON reservations (bucket, period, platform_id, kind, target_id, status)"
+        )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS music_usage ("
+            "period TEXT NOT NULL, platform_id TEXT NOT NULL, kind TEXT NOT NULL, "
+            "target_id TEXT NOT NULL, used INTEGER NOT NULL CHECK (used >= 0), "
+            "PRIMARY KEY (period, platform_id, kind, target_id))"
         )
 
         with self._transaction() as conn:
@@ -158,8 +216,7 @@ class Store:
                     self._native_settings.save(native_config)
                     self._set_meta(conn, "native_migrated", "1")
                 elif (
-                    native_raw != native_config
-                    or self._native_settings.needs_migration
+                    native_raw != native_config or self._native_settings.needs_migration
                 ):
                     self._native_settings.save(native_config)
                 conn.execute("DELETE FROM meta WHERE key = 'config'")
@@ -174,10 +231,13 @@ class Store:
                     self._set_meta(
                         conn, "config", json.dumps(config, ensure_ascii=False)
                     )
-            # AstrBot restarts the plugin process with execv, preserving its PID.
-            # A new Store marks all previous unfinished tickets as abandoned.
+            # Ordinary chat tickets retain the previous reload behavior. Music
+            # tickets are owned by the host process and may finish through a
+            # captured callback after this plugin is hot-reloaded.
             conn.execute(
-                "UPDATE reservations SET status = 'released' WHERE status = 'pending'"
+                "UPDATE reservations SET status = 'released' WHERE status = 'pending' "
+                "AND (external_ticket = 0 OR owner_process != ?)",
+                (self._process_id,),
             )
             self._ensure_period(conn, config, self._now_local())
 
@@ -267,7 +327,11 @@ class Store:
             _period_from_new_schedule, reset_at = self._period_bounds(
                 now, str(config["reset_time"])
             )
-        if period_expired or schedule_changed or stored_reset_time != previous_reset_time:
+        if (
+            period_expired
+            or schedule_changed
+            or stored_reset_time != previous_reset_time
+        ):
             self._set_meta(conn, "period", period)
             self._set_meta(conn, "reset_at", reset_at)
             self._set_meta(conn, "period_reset_time", str(config["reset_time"]))
@@ -303,9 +367,7 @@ class Store:
         if self._native_settings is not None:
             return _normalize_config(self._native_settings.load(), _default_config())
         if conn is not None:
-            row = conn.execute(
-                "SELECT value FROM meta WHERE key = 'config'"
-            ).fetchone()
+            row = conn.execute("SELECT value FROM meta WHERE key = 'config'").fetchone()
             if row is None:
                 return _default_config()
             return copy.deepcopy(json.loads(row["value"]))
@@ -320,10 +382,11 @@ class Store:
 
     @staticmethod
     def _read_used(
-        conn: sqlite3.Connection, scope: Scope, period: str
+        conn: sqlite3.Connection, scope: Scope, period: str, bucket: str = "chat"
     ) -> int:
+        table = "music_usage" if bucket == "music" else "usage"
         row = conn.execute(
-            "SELECT used FROM usage WHERE period = ? AND platform_id = ? "
+            f"SELECT used FROM {table} WHERE period = ? AND platform_id = ? "
             "AND kind = ? AND target_id = ?",
             (period, scope.platform_id, scope.kind, scope.target_id),
         ).fetchone()
@@ -336,16 +399,22 @@ class Store:
         config: Mapping[str, object],
         period: str,
         reset_at: str,
+        *,
+        bucket: str = "chat",
+        total_override: int | None = None,
     ) -> dict:
-        used = self._read_used(conn, scope, period)
+        used = self._read_used(conn, scope, period, bucket)
         reserved = int(
             conn.execute(
-                "SELECT COUNT(*) AS n FROM reservations WHERE status = 'pending' "
+                "SELECT COALESCE(SUM(units), 0) AS n FROM reservations "
+                "WHERE status = 'pending' AND bucket = ? "
                 "AND period = ? AND platform_id = ? AND kind = ? AND target_id = ?",
-                (period, scope.platform_id, scope.kind, scope.target_id),
+                (bucket, period, scope.platform_id, scope.kind, scope.target_id),
             ).fetchone()["n"]
         )
-        total = self._total_for(config, scope)
+        total = (
+            self._total_for(config, scope) if total_override is None else total_override
+        )
         mode = "blacklist" if total == -1 else "unlimited" if total == 0 else "limited"
         return {
             "platform_id": scope.platform_id,
@@ -370,7 +439,9 @@ class Store:
         if self._native_settings is not None:
             with self._lock:
                 self._ensure_open()
-                return _normalize_config(self._native_settings.load(), _default_config())
+                return _normalize_config(
+                    self._native_settings.load(), _default_config()
+                )
         with self._lock:
             self._ensure_open()
             row = self._conn.execute(
@@ -401,9 +472,7 @@ class Store:
                 # under the newly selected reset time.
                 self._set_meta(conn, "period", period)
                 self._set_meta(conn, "reset_at", reset_at)
-                self._set_meta(
-                    conn, "period_reset_time", normalized["reset_time"]
-                )
+                self._set_meta(conn, "period_reset_time", normalized["reset_time"])
             return copy.deepcopy(normalized)
 
     def snapshot(self, scope: Scope) -> dict:
@@ -411,85 +480,275 @@ class Store:
         with self._transaction() as conn:
             config = self._get_current_config(conn)
             period, reset_at = self._ensure_period(conn, config, self._now_local())
+            return self._snapshot_in_transaction(conn, scope, config, period, reset_at)
+
+    @staticmethod
+    def _music_total_for(config: Mapping[str, object], scope: Scope) -> int:
+        music = config.get("music_integration", {})
+        if not isinstance(music, Mapping):
+            music = _default_config()["music_integration"]
+        if scope.kind == "group":
+            for rule in music.get("group_rules", []):
+                if (
+                    isinstance(rule, Mapping)
+                    and rule.get("group_id") == scope.target_id
+                ):
+                    return int(rule["daily_limit"])
+            return int(music.get("default_group_limit", 200))
+
+        user_group_id = None
+        for group in config.get("user_groups", []):
+            if isinstance(group, Mapping) and scope.target_id in group.get(
+                "user_ids", []
+            ):
+                user_group_id = group.get("id")
+                break
+        if user_group_id is not None:
+            for rule in music.get("user_group_limits", []):
+                if (
+                    isinstance(rule, Mapping)
+                    and rule.get("user_group_id") == user_group_id
+                ):
+                    return int(rule["daily_limit"])
+        return int(music.get("default_user_limit", 70))
+
+    def music_snapshot(self, scope: Scope) -> dict:
+        """Return the independent music bucket snapshot for one scope."""
+        scope = self._validate_scope(scope)
+        with self._transaction() as conn:
+            config = self._get_current_config(conn)
+            period, reset_at = self._ensure_period(conn, config, self._now_local())
             return self._snapshot_in_transaction(
-                conn, scope, config, period, reset_at
+                conn,
+                scope,
+                config,
+                period,
+                reset_at,
+                bucket="music",
+                total_override=self._music_total_for(config, scope),
             )
 
-    def reserve(self, scope: Scope, request_id: str) -> Reservation | None:
+    def _reserve_in_transaction(
+        self,
+        conn: sqlite3.Connection,
+        scope: Scope,
+        request_id: str,
+        *,
+        units: int,
+        bucket: str,
+        total: int,
+        external: bool,
+        config: Mapping[str, object],
+        period: str,
+        reset_at: str,
+    ) -> tuple[Reservation | None, str | None, dict]:
+        existing = conn.execute(
+            "SELECT token, period, status, units, bucket, external_ticket "
+            "FROM reservations WHERE platform_id = ? AND kind = ? "
+            "AND target_id = ? AND request_id = ?",
+            (scope.platform_id, scope.kind, scope.target_id, request_id),
+        ).fetchone()
+        if existing is not None:
+            if existing["status"] == "released":
+                return (
+                    None,
+                    "released",
+                    self._snapshot_in_transaction(
+                        conn,
+                        scope,
+                        config,
+                        period,
+                        reset_at,
+                        bucket=bucket,
+                        total_override=total,
+                    ),
+                )
+            reservation = Reservation(
+                existing["token"],
+                scope,
+                existing["period"],
+                int(existing["units"]),
+                existing["bucket"],
+                bool(existing["external_ticket"]),
+            )
+            return (
+                reservation,
+                None,
+                self._snapshot_in_transaction(
+                    conn,
+                    scope,
+                    config,
+                    period,
+                    reset_at,
+                    bucket=bucket,
+                    total_override=total,
+                ),
+            )
+
+        snapshot = self._snapshot_in_transaction(
+            conn,
+            scope,
+            config,
+            period,
+            reset_at,
+            bucket=bucket,
+            total_override=total,
+        )
+        if total == -1:
+            return None, "blacklist", snapshot
+        if total > 0 and snapshot["remaining"] < units:
+            return None, "exhausted", snapshot
+
+        token = uuid.uuid4().hex
+        now_text = self._as_reset_at(self._now_local())
+        conn.execute(
+            "INSERT INTO reservations(token, request_id, platform_id, kind, target_id, "
+            "period, status, owner_session, owner_process, created_at, units, bucket, "
+            "external_ticket) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)",
+            (
+                token,
+                request_id,
+                scope.platform_id,
+                scope.kind,
+                scope.target_id,
+                period,
+                self._session_id,
+                self._process_id,
+                now_text,
+                units,
+                bucket,
+                int(external),
+            ),
+        )
+        reservation = Reservation(token, scope, period, units, bucket, external)
+        return reservation, None, snapshot
+
+    def reserve(
+        self,
+        scope: Scope,
+        request_id: str,
+        *,
+        units: int = 1,
+        bucket: str = "chat",
+        external: bool = False,
+    ) -> Reservation | None:
+        scope = self._validate_scope(scope)
+        if not isinstance(request_id, str) or not request_id.strip():
+            raise ValueError("request_id 不能为空")
+        if isinstance(units, bool) or not isinstance(units, int) or units < 1:
+            raise ValueError("units 必须是正整数")
+        if bucket not in {"chat", "music"}:
+            raise ValueError("bucket 必须是 chat 或 music")
+        if not isinstance(external, bool):
+            raise ValueError("external 必须是布尔值")
+        with self._transaction() as conn:
+            if self._closing:
+                return None
+            config = self._get_current_config(conn)
+            period, reset_at = self._ensure_period(conn, config, self._now_local())
+            reservation, _reason, _snapshot = self._reserve_in_transaction(
+                conn,
+                scope,
+                request_id,
+                units=units,
+                bucket=bucket,
+                total=self._total_for(config, scope),
+                external=external,
+                config=config,
+                period=period,
+                reset_at=reset_at,
+            )
+            return reservation
+
+    def reserve_music(self, scope: Scope, request_id: str) -> MusicReservationDecision:
+        """Atomically reserve music in its selected bucket and return denial context."""
         scope = self._validate_scope(scope)
         if not isinstance(request_id, str) or not request_id.strip():
             raise ValueError("request_id 不能为空")
         with self._transaction() as conn:
-            existing = conn.execute(
-                "SELECT token, period, status FROM reservations WHERE platform_id = ? "
-                "AND kind = ? AND target_id = ? AND request_id = ?",
-                (scope.platform_id, scope.kind, scope.target_id, request_id),
-            ).fetchone()
-            if existing is not None:
-                if existing["status"] == "released":
-                    return None
-                return Reservation(existing["token"], scope, existing["period"])
-
             config = self._get_current_config(conn)
-            period, _reset_at = self._ensure_period(conn, config, self._now_local())
-            total = self._total_for(config, scope)
-            used = self._read_used(conn, scope, period)
-            reserved = int(
-                conn.execute(
-                    "SELECT COUNT(*) AS n FROM reservations WHERE status = 'pending' "
-                    "AND period = ? AND platform_id = ? AND kind = ? AND target_id = ?",
-                    (period, scope.platform_id, scope.kind, scope.target_id),
-                ).fetchone()["n"]
+            period, reset_at = self._ensure_period(conn, config, self._now_local())
+            music = config.get("music_integration", {})
+            independent = bool(music.get("independent_quota", False))
+            multiplier = int(music.get("multiplier", 1))
+            bucket = "music" if independent else "chat"
+            cost = 1 if independent else multiplier
+            total = (
+                self._music_total_for(config, scope)
+                if independent
+                else self._total_for(config, scope)
             )
-            if total == -1 or (total > 0 and used + reserved >= total):
-                return None
-
-            token = uuid.uuid4().hex
-            now_text = self._as_reset_at(self._now_local())
-            conn.execute(
-                "INSERT INTO reservations(token, request_id, platform_id, kind, target_id, "
-                "period, status, owner_session, created_at) VALUES (?, ?, ?, ?, ?, ?, "
-                "'pending', ?, ?)",
-                (
-                    token,
-                    request_id,
-                    scope.platform_id,
-                    scope.kind,
-                    scope.target_id,
-                    period,
-                    self._session_id,
-                    now_text,
-                ),
+            snapshot = self._snapshot_in_transaction(
+                conn,
+                scope,
+                config,
+                period,
+                reset_at,
+                bucket=bucket,
+                total_override=total,
             )
-            return Reservation(token, scope, period)
+            if not music.get("enabled", False):
+                return MusicReservationDecision(
+                    None, "unavailable", snapshot, cost, multiplier, independent
+                )
+            if self._closing:
+                return MusicReservationDecision(
+                    None, "unavailable", snapshot, cost, multiplier, independent
+                )
+            reservation, reason, snapshot = self._reserve_in_transaction(
+                conn,
+                scope,
+                request_id,
+                units=cost,
+                bucket=bucket,
+                total=total,
+                external=True,
+                config=config,
+                period=period,
+                reset_at=reset_at,
+            )
+            if reason == "exhausted" and not independent:
+                reason = "shared_exhausted"
+            return MusicReservationDecision(
+                reservation, reason, snapshot, cost, multiplier, independent
+            )
 
     def commit(self, token: str) -> bool:
         if not isinstance(token, str) or not token:
             return False
         with self._transaction() as conn:
-            self._ensure_period(
-                conn, self._get_current_config(conn), self._now_local()
-            )
+            self._ensure_period(conn, self._get_current_config(conn), self._now_local())
             row = conn.execute(
-                "SELECT period, platform_id, kind, target_id, status "
+                "SELECT period, platform_id, kind, target_id, status, units, bucket "
                 "FROM reservations WHERE token = ?",
                 (token,),
             ).fetchone()
             if row is None or row["status"] == "released":
-                return False
-            if row["status"] == "committed":
-                return True
-            conn.execute(
-                "INSERT INTO usage(period, platform_id, kind, target_id, used) "
-                "VALUES (?, ?, ?, ?, 1) ON CONFLICT(period, platform_id, kind, target_id) "
-                "DO UPDATE SET used = used + 1",
-                (row["period"], row["platform_id"], row["kind"], row["target_id"]),
-            )
-            conn.execute(
-                "UPDATE reservations SET status = 'committed' WHERE token = ?",
-                (token,),
-            )
-            return True
+                result = False
+            elif row["status"] == "committed":
+                result = True
+            else:
+                table = "music_usage" if row["bucket"] == "music" else "usage"
+                conn.execute(
+                    f"INSERT INTO {table}(period, platform_id, kind, target_id, used) "
+                    "VALUES (?, ?, ?, ?, ?) "
+                    "ON CONFLICT(period, platform_id, kind, target_id) "
+                    "DO UPDATE SET used = used + excluded.used",
+                    (
+                        row["period"],
+                        row["platform_id"],
+                        row["kind"],
+                        row["target_id"],
+                        row["units"],
+                    ),
+                )
+                conn.execute(
+                    "UPDATE reservations SET status = 'committed' WHERE token = ?",
+                    (token,),
+                )
+                result = True
+        self._finish_deferred_close()
+        return result
 
     def release(self, token: str) -> bool:
         if not isinstance(token, str) or not token:
@@ -499,13 +758,39 @@ class Store:
                 "SELECT status FROM reservations WHERE token = ?", (token,)
             ).fetchone()
             if row is None or row["status"] == "committed":
-                return False
-            if row["status"] == "pending":
+                result = False
+            elif row["status"] == "pending":
                 conn.execute(
                     "UPDATE reservations SET status = 'released' WHERE token = ?",
                     (token,),
                 )
-            return True
+                result = True
+            else:
+                result = True
+        self._finish_deferred_close()
+        return result
+
+    def find_music_reservation(
+        self, request_id: str, token: str | None = None
+    ) -> str | None:
+        """Find an external ticket for an idempotent Music settlement callback."""
+        if not isinstance(request_id, str) or not request_id:
+            return None
+        with self._lock:
+            self._ensure_open()
+            if token:
+                row = self._conn.execute(
+                    "SELECT token FROM reservations WHERE token = ? AND request_id = ? "
+                    "AND external_ticket = 1",
+                    (token, request_id),
+                ).fetchone()
+            else:
+                row = self._conn.execute(
+                    "SELECT token FROM reservations WHERE request_id = ? "
+                    "AND external_ticket = 1 ORDER BY created_at DESC LIMIT 1",
+                    (request_id,),
+                ).fetchone()
+            return None if row is None else str(row["token"])
 
     def list_usage(self) -> list[dict]:
         with self._transaction() as conn:
@@ -514,7 +799,7 @@ class Store:
             scopes = conn.execute(
                 "SELECT platform_id, kind, target_id FROM usage WHERE period = ? "
                 "UNION SELECT platform_id, kind, target_id FROM reservations "
-                "WHERE period = ? AND status = 'pending' "
+                "WHERE period = ? AND status = 'pending' AND bucket = 'chat' "
                 "ORDER BY platform_id, kind, target_id",
                 (period, period),
             ).fetchall()
@@ -529,16 +814,66 @@ class Store:
                 for row in scopes
             ]
 
+    def list_music_usage(self) -> list[dict]:
+        """Return current-period scopes with independent music usage or tickets."""
+        with self._transaction() as conn:
+            config = self._get_current_config(conn)
+            period, reset_at = self._ensure_period(conn, config, self._now_local())
+            scopes = conn.execute(
+                "SELECT platform_id, kind, target_id FROM music_usage WHERE period = ? "
+                "UNION SELECT platform_id, kind, target_id FROM reservations "
+                "WHERE period = ? AND status = 'pending' AND bucket = 'music' "
+                "ORDER BY platform_id, kind, target_id",
+                (period, period),
+            ).fetchall()
+            rows = []
+            for row in scopes:
+                scope = Scope(row["platform_id"], row["kind"], row["target_id"])
+                rows.append(
+                    self._snapshot_in_transaction(
+                        conn,
+                        scope,
+                        config,
+                        period,
+                        reset_at,
+                        bucket="music",
+                        total_override=self._music_total_for(config, scope),
+                    )
+                )
+            return rows
+
+    def _finish_deferred_close(self) -> None:
+        with self._lock:
+            if not self._closing or self._closed:
+                return
+            pending = self._conn.execute(
+                "SELECT 1 FROM reservations WHERE status = 'pending' "
+                "AND external_ticket = 1 AND owner_session = ? LIMIT 1",
+                (self._session_id,),
+            ).fetchone()
+            if pending is None:
+                self._conn.close()
+                self._closed = True
+
     def close(self) -> None:
         with self._lock:
-            if self._closed:
+            if self._closed or self._closing:
                 return
-            with self._transaction():
-                self._conn.execute(
+            with self._transaction() as conn:
+                conn.execute(
                     "UPDATE reservations SET status = 'released' "
-                    "WHERE status = 'pending' AND owner_session = ?",
+                    "WHERE status = 'pending' AND owner_session = ? "
+                    "AND external_ticket = 0",
                     (self._session_id,),
                 )
+                external_pending = conn.execute(
+                    "SELECT 1 FROM reservations WHERE status = 'pending' "
+                    "AND external_ticket = 1 AND owner_session = ? LIMIT 1",
+                    (self._session_id,),
+                ).fetchone()
+            if external_pending is not None:
+                self._closing = True
+                return
             self._conn.close()
             self._closed = True
 
